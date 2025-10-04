@@ -66,13 +66,84 @@ const Booth = () => {
   };
 
   const downloadPhoto = () => {
-    if (capturedImage) {
-      const link = document.createElement("a");
-      link.href = capturedImage;
-      link.download = `vibranium-5.0-${Date.now()}.png`;
-      link.click();
-      toast.success("Photo downloaded!");
-    }
+    if (!capturedImage) return;
+
+    const downloadCanvas = document.createElement("canvas");
+    const ctx = downloadCanvas.getContext("2d");
+    if (!ctx) return;
+
+    // Template dimensions (square format)
+    const templateSize = 1080;
+    const borderWidth = 20;
+    const photoMargin = 100;
+    const photoSize = templateSize - (photoMargin * 2);
+
+    downloadCanvas.width = templateSize;
+    downloadCanvas.height = templateSize;
+
+    // Load the captured image
+    const img = new Image();
+    img.onload = () => {
+      // Draw black background
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, templateSize, templateSize);
+
+      // Draw cyan glowing border
+      ctx.strokeStyle = "#00D9FF";
+      ctx.lineWidth = borderWidth;
+      ctx.shadowColor = "#00D9FF";
+      ctx.shadowBlur = 30;
+      ctx.strokeRect(borderWidth / 2, borderWidth / 2, templateSize - borderWidth, templateSize - borderWidth);
+
+      // Reset shadow for photo
+      ctx.shadowBlur = 0;
+
+      // Draw the user's photo in the center
+      const imgAspect = img.width / img.height;
+      let drawWidth = photoSize;
+      let drawHeight = photoSize;
+      let offsetX = photoMargin;
+      let offsetY = photoMargin;
+
+      // Maintain aspect ratio
+      if (imgAspect > 1) {
+        drawHeight = photoSize / imgAspect;
+        offsetY = photoMargin + (photoSize - drawHeight) / 2;
+      } else {
+        drawWidth = photoSize * imgAspect;
+        offsetX = photoMargin + (photoSize - drawWidth) / 2;
+      }
+
+      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+
+      // Draw bottom text
+      ctx.fillStyle = "#00D9FF";
+      ctx.shadowColor = "#00D9FF";
+      ctx.shadowBlur = 20;
+      ctx.font = "bold 48px 'Orbitron', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("I Have Participated – Vibranium 5.0", templateSize / 2, templateSize - 80);
+
+      // Draw watermark
+      ctx.font = "bold 24px 'Orbitron', sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText("Vibranium 5.0", templateSize - 40, templateSize - 40);
+
+      // Download the composite image
+      downloadCanvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `vibranium-5.0-${Date.now()}.png`;
+          link.click();
+          URL.revokeObjectURL(url);
+          toast.success("Photo downloaded with template!");
+        }
+      }, "image/png");
+    };
+
+    img.src = capturedImage;
   };
 
   const retakePhoto = () => {
