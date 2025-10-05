@@ -289,8 +289,23 @@ const Booth = () => {
 
         {/* Main Camera/Photo View */}
         <div className="relative rounded-2xl overflow-hidden border-4 border-glow aspect-video mb-6 bg-metallic">
-          {!capturedImage ? (
+        {!capturedImage ? (
             <>
+              {/* Video Element - Always rendered */}
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                  cameraActive ? 'opacity-100 animate-fade-in' : 'opacity-0 pointer-events-none'
+                }`}
+                style={{
+                  transform: mirrorCamera ? 'scaleX(-1)' : 'scaleX(1)',
+                }}
+              />
+              <canvas ref={canvasRef} className="hidden" />
+              
               {/* Camera Power Toggle Button */}
               <Button
                 onClick={toggleCamera}
@@ -303,20 +318,8 @@ const Booth = () => {
                 </span>
               </Button>
 
-              {cameraActive ? (
+              {cameraActive && (
                 <>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="absolute inset-0 w-full h-full object-cover animate-fade-in"
-                    style={{
-                      transform: mirrorCamera ? 'scaleX(-1)' : 'scaleX(1)',
-                    }}
-                  />
-                  <canvas ref={canvasRef} className="hidden" />
-                  
                   {/* Holographic Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-accent/10 pointer-events-none" />
                   
@@ -330,7 +333,9 @@ const Booth = () => {
                     <FlipHorizontal className={`w-5 h-5 ${mirrorCamera ? 'text-primary' : 'text-muted-foreground'}`} />
                   </Button>
                 </>
-              ) : (
+              )}
+              
+              {!cameraActive && (
                 /* Camera Off Placeholder */
                 <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5 animate-fade-in">
                   <div className="text-center space-y-4 px-4">
@@ -338,11 +343,11 @@ const Booth = () => {
                       <Camera className="w-20 h-20 md:w-32 md:h-32 text-primary/30" />
                       <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full animate-pulse" />
                     </div>
-                    <p className="font-display text-lg md:text-2xl text-muted-foreground">
+                    <p className="font-display text-lg md:text-2xl text-primary text-glow-blue">
                       Camera Disabled
                     </p>
-                    <p className="text-sm md:text-base text-muted-foreground/70">
-                      Tap the power button to activate
+                    <p className="text-sm md:text-base text-accent text-glow-purple">
+                      Tap Power to Activate
                     </p>
                   </div>
                 </div>
