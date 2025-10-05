@@ -33,12 +33,15 @@ const Booth = () => {
       });
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        // Wait for video to be ready
+        await videoRef.current.play();
       }
       setStream(mediaStream);
       setCameraActive(true);
       toast.success("Camera activated!");
     } catch (error) {
-      toast.error("Camera access denied. Use upload instead.");
+      console.error("Camera error:", error);
+      toast.error("Camera access needed to capture your Vibranium moment.");
       setCameraActive(false);
     }
   };
@@ -67,16 +70,31 @@ const Booth = () => {
     if (canvasRef.current && videoRef.current) {
       const canvas = canvasRef.current;
       const video = videoRef.current;
+      
+      // Check if video is ready
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        toast.error("Camera not ready. Please wait a moment.");
+        return;
+      }
+      
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext("2d");
       if (ctx) {
+        // Save context state
+        ctx.save();
+        
         // Mirror the image if mirror mode is enabled
         if (mirrorCamera) {
           ctx.translate(canvas.width, 0);
           ctx.scale(-1, 1);
         }
+        
         ctx.drawImage(video, 0, 0);
+        
+        // Restore context state
+        ctx.restore();
+        
         const imageData = canvas.toDataURL("image/png");
         setCapturedImage(imageData);
         toast.success("Photo captured!");
