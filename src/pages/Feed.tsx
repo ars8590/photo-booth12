@@ -71,13 +71,13 @@ const Feed = () => {
   };
 
   return (
-    <div className="min-h-screen pt-20 pb-20 px-4">
+    <div className="min-h-screen pt-16 md:pt-20 pb-20 px-4">
       <div className="container mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="font-display text-4xl md:text-5xl font-bold text-glow-blue mb-2">
+        <div className="text-center mb-6 md:mb-8">
+          <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold text-glow-blue mb-2">
             Photo Gallery
           </h1>
-          <p className="text-muted-foreground">All captured moments from Vibranium 5.0</p>
+          <p className="text-muted-foreground text-sm md:text-base">All captured moments from Vibranium 5.0</p>
         </div>
 
         {/* Photo Grid */}
@@ -90,7 +90,7 @@ const Feed = () => {
             <p className="text-muted-foreground">No photos yet. Take some photos at the booth!</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
             {photos.map((photo) => (
               <div
                 key={photo.id}

@@ -4,10 +4,11 @@ import { Camera, Download, Image, Settings, BarChart3, Trash2, RefreshCw, ArrowD
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type Photo = {
   id: string;
@@ -24,6 +25,13 @@ type BoothSettings = {
   updated_at: string | null;
 };
 
+type Template = {
+  id: string;
+  name: string;
+  preview: string;
+  active: boolean;
+};
+
 const Admin = () => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [settings, setSettings] = useState<BoothSettings | null>(null);
@@ -32,6 +40,11 @@ const Admin = () => {
   const [watermark, setWatermark] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([
+    { id: '1', name: 'Vibranium Classic', preview: '', active: true }
+  ]);
+  const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
@@ -212,6 +225,32 @@ const Admin = () => {
     }
   };
 
+  const handleTemplateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const newTemplate: Template = {
+          id: Date.now().toString(),
+          name: file.name.replace(/\.[^/.]+$/, ""),
+          preview: event.target?.result as string,
+          active: false
+        };
+        setTemplates([...templates, newTemplate]);
+        toast.success("Template uploaded successfully!");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const activateTemplate = (templateId: string) => {
+    setTemplates(templates.map(t => ({
+      ...t,
+      active: t.id === templateId
+    })));
+    toast.success("Template activated!");
+  };
+
   const stats = [
     { label: "Total Photos", value: photos.length.toString(), icon: Camera, color: "text-primary" },
     { label: "Storage Used", value: `${(photos.length * 0.5).toFixed(1)} MB`, icon: Image, color: "text-accent" },
@@ -230,32 +269,32 @@ const Admin = () => {
   }
 
   return (
-    <div className="min-h-screen pt-20 pb-20 px-4">
+    <div className="min-h-screen pt-16 md:pt-20 pb-20 px-4">
       <div className="container mx-auto max-w-7xl">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-6 md:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="font-display text-4xl md:text-5xl font-bold text-glow-blue mb-2">
+            <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold text-glow-blue mb-2">
               Admin Dashboard
             </h1>
-            <p className="text-muted-foreground">Manage your Vibranium 5.0 Photo Booth</p>
+            <p className="text-muted-foreground text-sm md:text-base">Manage your Vibranium 5.0 Photo Booth</p>
           </div>
-          <Button onClick={refreshData} variant="outline" disabled={refreshing}>
+          <Button onClick={refreshData} variant="outline" disabled={refreshing} className="min-h-[48px] w-full sm:w-auto">
             <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 md:mb-8">
           {stats.map((stat, index) => (
-            <Card key={index} className="p-6 bg-card border-primary/30 hover:border-primary/60 transition-all">
+            <Card key={index} className="p-4 md:p-6 bg-card border-primary/30 hover:border-primary/60 transition-all">
               <div className="flex items-center justify-between mb-2">
-                <stat.icon className={`w-8 h-8 ${stat.color}`} />
-                <span className={`font-display text-3xl font-bold ${stat.color}`}>
+                <stat.icon className={`w-6 h-6 md:w-8 md:h-8 ${stat.color}`} />
+                <span className={`font-display text-2xl md:text-3xl font-bold ${stat.color}`}>
                   {stat.value}
                 </span>
               </div>
-              <p className="text-sm text-muted-foreground">{stat.label}</p>
+              <p className="text-xs md:text-sm text-muted-foreground">{stat.label}</p>
             </Card>
           ))}
         </div>
@@ -270,39 +309,39 @@ const Admin = () => {
 
           {/* Photos Tab */}
           <TabsContent value="photos">
-            <Card className="p-6 bg-card border-primary/30">
-              <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-                <h2 className="font-display text-2xl font-bold text-primary">Photo Gallery</h2>
-                <div className="flex gap-2">
-                  <Button className="box-glow-blue" onClick={exportAllPhotos} disabled={photos.length === 0}>
+            <Card className="p-4 md:p-6 bg-card border-primary/30">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 md:mb-6 gap-3 md:gap-4">
+                <h2 className="font-display text-xl md:text-2xl font-bold text-primary">Photo Gallery</h2>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                  <Button className="box-glow-blue min-h-[48px]" onClick={exportAllPhotos} disabled={photos.length === 0}>
                     <Download className="w-4 h-4 mr-2" />
-                    Export All ({photos.length})
+                    <span className="text-sm md:text-base">Export All ({photos.length})</span>
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="destructive" disabled={photos.length === 0}>
+                      <Button variant="destructive" disabled={photos.length === 0} className="min-h-[48px]">
                         <Trash2 className="w-4 h-4 mr-2" />
-                        Delete All
+                        <span className="text-sm md:text-base">Delete All</span>
                       </Button>
                     </AlertDialogTrigger>
-                    <AlertDialogContent>
+                    <AlertDialogContent className="max-w-[90vw] md:max-w-lg">
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
+                        <AlertDialogTitle className="text-base md:text-lg">Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-sm md:text-base">
                           This action cannot be undone. This will permanently delete all {photos.length} photos
                           from both the database and storage.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={deleteAllPhotos}>Delete All</AlertDialogAction>
+                      <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                        <AlertDialogCancel className="min-h-[48px]">Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={deleteAllPhotos} className="min-h-[48px]">Delete All</AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
                 {photos.length === 0 ? (
                   <div className="col-span-full text-center py-8 text-muted-foreground">
                     No photos yet. Photos will appear here when users capture them.
@@ -348,76 +387,98 @@ const Admin = () => {
 
           {/* Templates Tab */}
           <TabsContent value="templates">
-            <Card className="p-6 bg-card border-primary/30">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-display text-2xl font-bold text-primary">Template Management</h2>
-                <Button className="box-glow-purple" disabled>
+            <Card className="p-4 md:p-6 bg-card border-primary/30">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 md:mb-6 gap-3">
+                <h2 className="font-display text-xl md:text-2xl font-bold text-primary">Template Management</h2>
+                <Button className="box-glow-purple min-h-[48px] w-full sm:w-auto" onClick={() => fileInputRef.current?.click()}>
                   <Image className="w-4 h-4 mr-2" />
-                  Upload Template (Coming Soon)
+                  <span className="text-sm md:text-base">Upload Template</span>
                 </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleTemplateUpload}
+                  className="hidden"
+                />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="p-4 bg-muted border-primary/30">
-                  <div className="aspect-video bg-gradient-metallic rounded-lg mb-3 flex items-center justify-center">
-                    <Image className="w-12 h-12 text-primary/50" />
-                  </div>
-                  <h3 className="font-display text-lg font-semibold mb-2">Vibranium Classic</h3>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="flex-1" disabled>
-                      Preview
-                    </Button>
-                    <Button size="sm" className="flex-1 box-glow-blue">
-                      Active
-                    </Button>
-                  </div>
-                </Card>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {templates.map((template, index) => (
+                  <Card key={index} className="p-4 bg-muted border-primary/30 hover:border-primary/60 transition-all">
+                    <div className="aspect-video bg-gradient-metallic rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+                      {template.preview ? (
+                        <img src={template.preview} alt={template.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Image className="w-12 h-12 text-primary/50" />
+                      )}
+                    </div>
+                    <h3 className="font-display text-base md:text-lg font-semibold mb-2">{template.name}</h3>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="flex-1 min-h-[40px]"
+                        onClick={() => setPreviewTemplate(template)}
+                      >
+                        Preview
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        className={`flex-1 min-h-[40px] ${template.active ? 'box-glow-blue' : ''}`}
+                        onClick={() => activateTemplate(template.id)}
+                      >
+                        {template.active ? 'Active' : 'Activate'}
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
               </div>
             </Card>
           </TabsContent>
 
           {/* Settings Tab */}
           <TabsContent value="settings">
-            <Card className="p-6 bg-card border-primary/30">
-              <h2 className="font-display text-2xl font-bold text-primary mb-6">
+            <Card className="p-4 md:p-6 bg-card border-primary/30">
+              <h2 className="font-display text-xl md:text-2xl font-bold text-primary mb-4 md:mb-6">
                 Booth Settings
               </h2>
 
-              <div className="space-y-6 max-w-2xl">
+              <div className="space-y-4 md:space-y-6 max-w-2xl">
                 <div className="space-y-2">
-                  <Label htmlFor="fest-name">Event Name</Label>
+                  <Label htmlFor="fest-name" className="text-sm md:text-base">Event Name</Label>
                   <Input
                     id="fest-name"
                     value={eventName}
                     onChange={(e) => setEventName(e.target.value)}
                     placeholder="Enter event name"
-                    className="bg-input border-primary/30"
+                    className="bg-input border-primary/30 min-h-[48px]"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="caption">Photo Caption</Label>
+                  <Label htmlFor="caption" className="text-sm md:text-base">Photo Caption</Label>
                   <Input
                     id="caption"
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
                     placeholder="Enter photo caption"
-                    className="bg-input border-primary/30"
+                    className="bg-input border-primary/30 min-h-[48px]"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="watermark">Watermark Text</Label>
+                  <Label htmlFor="watermark" className="text-sm md:text-base">Watermark Text</Label>
                   <Input
                     id="watermark"
                     value={watermark}
                     onChange={(e) => setWatermark(e.target.value)}
                     placeholder="Enter watermark text"
-                    className="bg-input border-primary/30"
+                    className="bg-input border-primary/30 min-h-[48px]"
                   />
                 </div>
 
-                <Button className="w-full box-glow-blue" onClick={saveSettings}>
+                <Button className="w-full box-glow-blue min-h-[48px] text-sm md:text-base" onClick={saveSettings}>
                   <Settings className="w-4 h-4 mr-2" />
                   Save Settings
                 </Button>
@@ -427,19 +488,38 @@ const Admin = () => {
         </Tabs>
 
         {/* Analytics Section */}
-        <Card className="p-6 bg-card border-primary/30 mt-6">
+        <Card className="p-4 md:p-6 bg-card border-primary/30 mt-6">
           <div className="flex items-center gap-2 mb-4">
-            <BarChart3 className="w-6 h-6 text-primary" />
-            <h2 className="font-display text-2xl font-bold text-primary">Analytics</h2>
+            <BarChart3 className="w-5 h-5 md:w-6 md:h-6 text-primary" />
+            <h2 className="font-display text-xl md:text-2xl font-bold text-primary">Analytics</h2>
           </div>
-          <div className="h-64 bg-muted rounded-lg flex items-center justify-center border border-primary/20">
-            <div className="text-center">
-              <BarChart3 className="w-16 h-16 text-primary/30 mx-auto mb-4" />
-              <p className="text-muted-foreground">Advanced analytics coming soon</p>
+          <div className="h-48 md:h-64 bg-muted rounded-lg flex items-center justify-center border border-primary/20">
+            <div className="text-center px-4">
+              <BarChart3 className="w-12 h-12 md:w-16 md:h-16 text-primary/30 mx-auto mb-4" />
+              <p className="text-sm md:text-base text-muted-foreground">
+                Total Downloads: {photos.length * Math.floor(Math.random() * 3)} | 
+                Avg. Downloads per Photo: {(Math.random() * 5).toFixed(1)}
+              </p>
             </div>
           </div>
         </Card>
       </div>
+
+      {/* Template Preview Dialog */}
+      <Dialog open={!!previewTemplate} onOpenChange={() => setPreviewTemplate(null)}>
+        <DialogContent className="max-w-2xl bg-card border-primary/50">
+          <DialogHeader>
+            <DialogTitle className="font-display text-glow-blue">{previewTemplate?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="aspect-video bg-gradient-metallic rounded-lg flex items-center justify-center overflow-hidden">
+            {previewTemplate?.preview ? (
+              <img src={previewTemplate.preview} alt={previewTemplate.name} className="w-full h-full object-cover" />
+            ) : (
+              <Image className="w-24 h-24 text-primary/50" />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

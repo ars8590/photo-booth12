@@ -22,34 +22,34 @@ const Navigation = () => {
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 bg-card/50 backdrop-blur-md border-b border-primary/30">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-3 md:py-4">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-lg bg-gradient-vibranium flex items-center justify-center">
-                <Camera className="w-6 h-6 text-background" />
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-gradient-vibranium flex items-center justify-center">
+                <Camera className="w-5 h-5 md:w-6 md:h-6 text-background" />
               </div>
-              <h1 className="font-display font-bold text-xl text-glow-blue">VIBRANIUM 5.0</h1>
+              <h1 className="font-display font-bold text-base md:text-xl text-glow-blue">VIBRANIUM 5.0</h1>
             </Link>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4">
               <Link to="/">
                 <Button
                   variant={location.pathname === "/" ? "default" : "ghost"}
                   size="sm"
-                  className={location.pathname === "/" ? "box-glow-blue" : ""}
+                  className={`min-h-[48px] ${location.pathname === "/" ? "box-glow-blue" : ""}`}
                 >
-                  <Camera className="w-4 h-4 mr-2" />
-                  Booth
+                  <Camera className="w-4 h-4 md:mr-2" />
+                  <span className="hidden sm:inline">Booth</span>
                 </Button>
               </Link>
               <Link to="/feed">
                 <Button
                   variant={location.pathname === "/feed" ? "default" : "ghost"}
                   size="sm"
-                  className={location.pathname === "/feed" ? "box-glow-blue" : ""}
+                  className={`min-h-[48px] ${location.pathname === "/feed" ? "box-glow-blue" : ""}`}
                 >
-                  <Grid3x3 className="w-4 h-4 mr-2" />
-                  Feed
+                  <Grid3x3 className="w-4 h-4 md:mr-2" />
+                  <span className="hidden sm:inline">Feed</span>
                 </Button>
               </Link>
             </div>

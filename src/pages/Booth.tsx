@@ -184,13 +184,13 @@ const Booth = () => {
   };
 
   return (
-    <div className="min-h-screen pt-20 pb-20 px-4">
+    <div className="min-h-screen pt-16 md:pt-20 pb-20 px-4">
       <div className="container mx-auto max-w-4xl">
-        <div className="text-center mb-8">
-          <h1 className="font-display text-4xl md:text-6xl font-bold text-glow-blue mb-2">
+        <div className="text-center mb-6 md:mb-8">
+          <h1 className="font-display text-3xl sm:text-4xl md:text-6xl font-bold text-glow-blue mb-2">
             VIBRANIUM 5.0
           </h1>
-          <p className="text-muted-foreground text-lg">AI-Powered Photo Booth Experience</p>
+          <p className="text-muted-foreground text-sm md:text-lg">AI-Powered Photo Booth Experience</p>
         </div>
 
         {/* Main Camera/Photo View */}
@@ -241,25 +241,25 @@ const Booth = () => {
         </div>
 
         {/* Control Buttons */}
-        <div className="flex flex-wrap gap-4 justify-center">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 md:gap-4 justify-center">
           {!capturedImage ? (
             <>
               <Button
                 onClick={capturePhoto}
                 disabled={!cameraActive}
                 size="lg"
-                className="box-glow-blue font-display text-lg px-8"
+                className="box-glow-blue font-display text-base md:text-lg px-6 md:px-8 min-h-[48px] w-full sm:w-auto"
               >
-                <Camera className="w-5 h-5 mr-2" />
+                <Camera className="w-4 h-4 md:w-5 md:h-5 mr-2" />
                 Capture Photo
               </Button>
               <Button
                 onClick={() => fileInputRef.current?.click()}
                 variant="secondary"
                 size="lg"
-                className="box-glow-purple font-display text-lg px-8"
+                className="box-glow-purple font-display text-base md:text-lg px-6 md:px-8 min-h-[48px] w-full sm:w-auto"
               >
-                <Upload className="w-5 h-5 mr-2" />
+                <Upload className="w-4 h-4 md:w-5 md:h-5 mr-2" />
                 Upload Photo
               </Button>
               <input
@@ -275,18 +275,18 @@ const Booth = () => {
               <Button
                 onClick={downloadPhoto}
                 size="lg"
-                className="box-glow-blue font-display text-lg px-8"
+                className="box-glow-blue font-display text-base md:text-lg px-6 md:px-8 min-h-[48px] w-full sm:w-auto"
               >
-                <Download className="w-5 h-5 mr-2" />
+                <Download className="w-4 h-4 md:w-5 md:h-5 mr-2" />
                 Save and Download Photo
               </Button>
               <Button
                 onClick={retakePhoto}
                 variant="secondary"
                 size="lg"
-                className="box-glow-purple font-display text-lg px-8"
+                className="box-glow-purple font-display text-base md:text-lg px-6 md:px-8 min-h-[48px] w-full sm:w-auto"
               >
-                <RotateCcw className="w-5 h-5 mr-2" />
+                <RotateCcw className="w-4 h-4 md:w-5 md:h-5 mr-2" />
                 Retake
               </Button>
             </>
