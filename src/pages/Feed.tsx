@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Download, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { supabase, Photo } from "@/lib/supabase";
+import { toast } from "sonner";
 
 // Sample photos for demonstration
 const samplePhotos = [
@@ -18,6 +20,48 @@ const samplePhotos = [
 
 const Feed = () => {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadPhotos();
+    
+    // Subscribe to new photos
+    const channel = supabase
+      .channel('photos-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'photos'
+        },
+        () => loadPhotos()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const loadPhotos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('photos')
+        .select('*')
+        .eq('approved', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPhotos(data || []);
+    } catch (error) {
+      console.error('Error loading photos:', error);
+      toast.error("Failed to load photos");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const downloadPhoto = (url: string) => {
     const link = document.createElement("a");
@@ -37,18 +81,27 @@ const Feed = () => {
         </div>
 
         {/* Photo Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {samplePhotos.map((photo, index) => (
-            <div
-              key={index}
-              onClick={() => setSelectedPhoto(photo)}
-              className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 border-primary/20 hover:border-primary transition-all duration-300"
-            >
-              <img
-                src={photo}
-                alt={`Photo ${index + 1}`}
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-              />
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading photos...</p>
+          </div>
+        ) : photos.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">No photos yet. Take some photos at the booth!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {photos.map((photo) => (
+              <div
+                key={photo.id}
+                onClick={() => setSelectedPhoto(photo.image_url)}
+                className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 border-primary/20 hover:border-primary transition-all duration-300"
+              >
+                <img
+                  src={photo.image_url}
+                  alt="Gallery photo"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                />
               
               {/* Hover Overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -62,8 +115,9 @@ const Feed = () => {
               {/* Corner Accent */}
               <div className="absolute top-1 right-1 w-8 h-8 border-r-2 border-t-2 border-primary opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Photo Modal */}

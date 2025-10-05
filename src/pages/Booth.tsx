@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Camera, Upload, Download, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 
 const Booth = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -65,7 +66,7 @@ const Booth = () => {
     }
   };
 
-  const downloadPhoto = () => {
+  const downloadPhoto = async () => {
     if (!capturedImage) return;
 
     const downloadCanvas = document.createElement("canvas");
@@ -83,7 +84,7 @@ const Booth = () => {
 
     // Load the captured image
     const img = new Image();
-    img.onload = () => {
+    img.onload = async () => {
       // Draw black background
       ctx.fillStyle = "#000000";
       ctx.fillRect(0, 0, templateSize, templateSize);
@@ -129,16 +130,46 @@ const Booth = () => {
       ctx.textAlign = "right";
       ctx.fillText("Vibranium 5.0", templateSize - 40, templateSize - 40);
 
-      // Download the composite image
-      downloadCanvas.toBlob((blob) => {
+      // Convert to blob and save to database
+      downloadCanvas.toBlob(async (blob) => {
         if (blob) {
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = `vibranium-5.0-${Date.now()}.png`;
-          link.click();
-          URL.revokeObjectURL(url);
-          toast.success("Photo downloaded with template!");
+          try {
+            // Upload to storage
+            const fileName = `vibranium-5.0-${Date.now()}.png`;
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('photos')
+              .upload(fileName, blob, {
+                contentType: 'image/png',
+                cacheControl: '3600',
+              });
+
+            if (uploadError) throw uploadError;
+
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+              .from('photos')
+              .getPublicUrl(fileName);
+
+            // Save to database
+            const { error: dbError } = await supabase
+              .from('photos')
+              .insert({ image_url: publicUrl });
+
+            if (dbError) throw dbError;
+
+            // Download the file
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = fileName;
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            toast.success("Photo saved and downloaded!");
+          } catch (error) {
+            console.error('Error saving photo:', error);
+            toast.error("Failed to save photo");
+          }
         }
       }, "image/png");
     };

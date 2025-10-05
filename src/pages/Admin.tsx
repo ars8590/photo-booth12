@@ -4,13 +4,82 @@ import { Camera, Users, Download, Image, Settings, BarChart3 } from "lucide-reac
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useState, useEffect } from "react";
+import { supabase, Photo, BoothSettings } from "@/lib/supabase";
+import { toast } from "sonner";
 
 const Admin = () => {
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [settings, setSettings] = useState<BoothSettings | null>(null);
+  const [eventName, setEventName] = useState("");
+  const [caption, setCaption] = useState("");
+  const [watermark, setWatermark] = useState("");
+
+  useEffect(() => {
+    loadPhotos();
+    loadSettings();
+  }, []);
+
+  const loadPhotos = async () => {
+    const { data } = await supabase
+      .from('photos')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (data) setPhotos(data);
+  };
+
+  const loadSettings = async () => {
+    const { data } = await supabase
+      .from('booth_settings')
+      .select('*')
+      .limit(1)
+      .single();
+    if (data) {
+      setSettings(data);
+      setEventName(data.event_name);
+      setCaption(data.caption);
+      setWatermark(data.watermark);
+    }
+  };
+
+  const exportAllPhotos = async () => {
+    toast.info("Preparing photos for export...");
+    photos.forEach((photo, index) => {
+      setTimeout(() => {
+        const link = document.createElement("a");
+        link.href = photo.image_url;
+        link.download = `photo-${index + 1}.png`;
+        link.click();
+      }, index * 100);
+    });
+    toast.success(`Exporting ${photos.length} photos!`);
+  };
+
+  const saveSettings = async () => {
+    if (!settings) return;
+    
+    const { error } = await supabase
+      .from('booth_settings')
+      .update({
+        event_name: eventName,
+        caption: caption,
+        watermark: watermark,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', settings.id);
+
+    if (error) {
+      toast.error("Failed to save settings");
+    } else {
+      toast.success("Settings saved successfully!");
+    }
+  };
+
   const stats = [
-    { label: "Photos Taken", value: "1,247", icon: Camera, color: "text-primary" },
+    { label: "Photos Taken", value: photos.length.toString(), icon: Camera, color: "text-primary" },
     { label: "Total Users", value: "892", icon: Users, color: "text-accent" },
     { label: "Downloads", value: "3,421", icon: Download, color: "text-primary" },
-    { label: "Active Templates", value: "5", icon: Image, color: "text-accent" },
+    { label: "Active Templates", value: "1", icon: Image, color: "text-accent" },
   ];
 
   return (
@@ -51,18 +120,24 @@ const Admin = () => {
             <Card className="p-6 bg-card border-primary/30">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="font-display text-2xl font-bold text-primary">Photo Gallery</h2>
-                <Button className="box-glow-blue">
+                <Button className="box-glow-blue" onClick={exportAllPhotos}>
                   <Download className="w-4 h-4 mr-2" />
-                  Export All
+                  Export All ({photos.length})
                 </Button>
               </div>
               
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {Array.from({ length: 12 }).map((_, i) => (
-                  <div key={i} className="aspect-square rounded-lg bg-muted border border-primary/20 flex items-center justify-center">
-                    <Camera className="w-8 h-8 text-primary/30" />
+                {photos.length === 0 ? (
+                  <div className="col-span-full text-center py-8 text-muted-foreground">
+                    No photos yet
                   </div>
-                ))}
+                ) : (
+                  photos.map((photo) => (
+                    <div key={photo.id} className="aspect-square rounded-lg bg-muted border border-primary/20 overflow-hidden">
+                      <img src={photo.image_url} alt="Gallery" className="w-full h-full object-cover" />
+                    </div>
+                  ))
+                )}
               </div>
             </Card>
           </TabsContent>
@@ -111,7 +186,8 @@ const Admin = () => {
                   <Label htmlFor="fest-name">Event Name</Label>
                   <Input
                     id="fest-name"
-                    defaultValue="Vibranium 5.0"
+                    value={eventName}
+                    onChange={(e) => setEventName(e.target.value)}
                     className="bg-input border-primary/30"
                   />
                 </div>
@@ -120,7 +196,8 @@ const Admin = () => {
                   <Label htmlFor="caption">Photo Caption</Label>
                   <Input
                     id="caption"
-                    defaultValue="I HAVE PARTICIPATED"
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
                     className="bg-input border-primary/30"
                   />
                 </div>
@@ -129,12 +206,13 @@ const Admin = () => {
                   <Label htmlFor="watermark">Watermark Text</Label>
                   <Input
                     id="watermark"
-                    defaultValue="V5.0"
+                    value={watermark}
+                    onChange={(e) => setWatermark(e.target.value)}
                     className="bg-input border-primary/30"
                   />
                 </div>
 
-                <Button className="w-full box-glow-blue">
+                <Button className="w-full box-glow-blue" onClick={saveSettings}>
                   <Settings className="w-4 h-4 mr-2" />
                   Save Settings
                 </Button>
