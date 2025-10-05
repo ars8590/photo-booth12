@@ -177,8 +177,9 @@ const Booth = () => {
     img.src = capturedImage;
   };
 
-  const retakePhoto = () => {
+  const retakePhoto = async () => {
     setCapturedImage(null);
+    await startCamera();
     toast.info("Ready for next photo!");
   };
 
