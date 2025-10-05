@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Camera, Users, Download, Image, Settings, BarChart3, Trash2, RefreshCw } from "lucide-react";
+import { Camera, Download, Image, Settings, BarChart3, Trash2, RefreshCw, ArrowDownToLine } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -214,9 +214,8 @@ const Admin = () => {
 
   const stats = [
     { label: "Total Photos", value: photos.length.toString(), icon: Camera, color: "text-primary" },
-    { label: "Approved", value: photos.filter(p => p.approved).length.toString(), icon: Users, color: "text-accent" },
-    { label: "Storage Used", value: `${(photos.length * 0.5).toFixed(1)} MB`, icon: Download, color: "text-primary" },
-    { label: "Event Active", value: "Live", icon: Image, color: "text-accent" },
+    { label: "Storage Used", value: `${(photos.length * 0.5).toFixed(1)} MB`, icon: Image, color: "text-accent" },
+    { label: "Photos Downloaded", value: "0", icon: ArrowDownToLine, color: "text-primary" },
   ];
 
   if (loading) {
@@ -247,7 +246,7 @@ const Admin = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           {stats.map((stat, index) => (
             <Card key={index} className="p-6 bg-card border-primary/30 hover:border-primary/60 transition-all">
               <div className="flex items-center justify-between mb-2">
