@@ -309,13 +309,14 @@ const Booth = () => {
               {/* Camera Power Toggle Button */}
               <Button
                 onClick={toggleCamera}
-                size="lg"
-                className="absolute top-4 left-4 box-glow-blue backdrop-blur-sm bg-background/80 border border-primary/30 z-10 gap-2 transition-all duration-300 hover:scale-105"
+                size="icon"
+                className={`absolute top-4 left-4 backdrop-blur-sm border z-10 transition-all duration-300 hover:scale-110 ${
+                  cameraActive 
+                    ? 'bg-primary/20 border-primary shadow-[0_0_20px_rgba(0,217,255,0.6)] text-primary' 
+                    : 'bg-background/50 border-muted-foreground/20 text-muted-foreground/50'
+                }`}
               >
-                <Power className={`w-5 h-5 transition-all duration-300 ${cameraActive ? 'text-primary animate-pulse' : 'text-muted-foreground'}`} />
-                <span className="font-display text-sm">
-                  {cameraActive ? "Camera On" : "Camera Off"}
-                </span>
+                <Power className={`w-5 h-5 transition-all duration-300 ${cameraActive ? 'animate-pulse' : ''}`} />
               </Button>
 
               {cameraActive && (
