@@ -278,7 +278,7 @@ const Booth = () => {
                 className="box-glow-blue font-display text-lg px-8"
               >
                 <Download className="w-5 h-5 mr-2" />
-                Download Photo
+                Save and Download Photo
               </Button>
               <Button
                 onClick={retakePhoto}
