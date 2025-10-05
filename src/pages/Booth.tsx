@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera, Upload, Download, RotateCcw, FlipHorizontal } from "lucide-react";
+import { Camera, Upload, Download, RotateCcw, FlipHorizontal, Power } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
@@ -14,13 +14,12 @@ const Booth = () => {
   const [mirrorCamera, setMirrorCamera] = useState(true);
 
   useEffect(() => {
-    startCamera();
     return () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, []);
+  }, [stream]);
 
   const startCamera = async () => {
     try {
@@ -41,6 +40,26 @@ const Booth = () => {
     } catch (error) {
       toast.error("Camera access denied. Use upload instead.");
       setCameraActive(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraActive(false);
+    toast.info("Camera deactivated");
+  };
+
+  const toggleCamera = async () => {
+    if (cameraActive) {
+      stopCamera();
+    } else {
+      await startCamera();
     }
   };
 
@@ -208,30 +227,62 @@ const Booth = () => {
         <div className="relative rounded-2xl overflow-hidden border-4 border-glow aspect-video mb-6 bg-metallic">
           {!capturedImage ? (
             <>
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-                style={{
-                  transform: mirrorCamera ? 'scaleX(-1)' : 'scaleX(1)',
-                }}
-              />
-              <canvas ref={canvasRef} className="hidden" />
-              
-              {/* Holographic Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-accent/10 pointer-events-none" />
-              
-              {/* Mirror Toggle Button */}
+              {/* Camera Power Toggle Button */}
               <Button
-                onClick={() => setMirrorCamera(!mirrorCamera)}
-                size="icon"
-                variant="secondary"
-                className="absolute top-4 right-4 box-glow-blue backdrop-blur-sm bg-background/50 border border-primary/30 z-10"
+                onClick={toggleCamera}
+                size="lg"
+                className="absolute top-4 left-4 box-glow-blue backdrop-blur-sm bg-background/80 border border-primary/30 z-10 gap-2 transition-all duration-300 hover:scale-105"
               >
-                <FlipHorizontal className={`w-5 h-5 ${mirrorCamera ? 'text-primary' : 'text-muted-foreground'}`} />
+                <Power className={`w-5 h-5 transition-all duration-300 ${cameraActive ? 'text-primary animate-pulse' : 'text-muted-foreground'}`} />
+                <span className="font-display text-sm">
+                  {cameraActive ? "Camera On" : "Camera Off"}
+                </span>
               </Button>
+
+              {cameraActive ? (
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover animate-fade-in"
+                    style={{
+                      transform: mirrorCamera ? 'scaleX(-1)' : 'scaleX(1)',
+                    }}
+                  />
+                  <canvas ref={canvasRef} className="hidden" />
+                  
+                  {/* Holographic Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-accent/10 pointer-events-none" />
+                  
+                  {/* Mirror Toggle Button */}
+                  <Button
+                    onClick={() => setMirrorCamera(!mirrorCamera)}
+                    size="icon"
+                    variant="secondary"
+                    className="absolute top-4 right-4 box-glow-blue backdrop-blur-sm bg-background/50 border border-primary/30 z-10"
+                  >
+                    <FlipHorizontal className={`w-5 h-5 ${mirrorCamera ? 'text-primary' : 'text-muted-foreground'}`} />
+                  </Button>
+                </>
+              ) : (
+                /* Camera Off Placeholder */
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5 animate-fade-in">
+                  <div className="text-center space-y-4 px-4">
+                    <div className="relative inline-block">
+                      <Camera className="w-20 h-20 md:w-32 md:h-32 text-primary/30" />
+                      <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full animate-pulse" />
+                    </div>
+                    <p className="font-display text-lg md:text-2xl text-muted-foreground">
+                      Camera Disabled
+                    </p>
+                    <p className="text-sm md:text-base text-muted-foreground/70">
+                      Tap the power button to activate
+                    </p>
+                  </div>
+                </div>
+              )}
               
               {/* Corner Accents */}
               <div className="absolute top-2 left-2 w-12 h-12 sm:w-16 sm:h-16 border-l-4 border-t-4 border-primary box-glow-blue" />
