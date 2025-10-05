@@ -24,18 +24,38 @@ const Booth = () => {
   const startCamera = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          facingMode: "user",
+        video: {
+          facingMode: { ideal: "user" },
           width: { ideal: 1920 },
           height: { ideal: 1080 },
-          aspectRatio: { ideal: 16/9 }
-        }
+          aspectRatio: { ideal: 16 / 9 },
+        },
+        audio: false,
       });
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        // Wait for video to be ready
-        await videoRef.current.play();
+
+      const video = videoRef.current;
+      if (video) {
+        // iOS-safe inline playback
+        video.setAttribute("playsinline", "true");
+        video.setAttribute("muted", "true");
+        video.muted = true;
+        (video as any).srcObject = mediaStream;
+
+        // Wait for metadata to ensure dimensions are available
+        await new Promise<void>((resolve) => {
+          const ready = () => resolve();
+          if (video.readyState >= 1 && video.videoWidth > 0) resolve();
+          else video.addEventListener("loadedmetadata", ready, { once: true });
+        });
+
+        // Start playback (allowed after user gesture)
+        try {
+          await video.play();
+        } catch (_) {
+          // Some browsers may reject play(); ignore and rely on next user gesture
+        }
       }
+
       setStream(mediaStream);
       setCameraActive(true);
       toast.success("Camera activated!");
@@ -48,11 +68,14 @@ const Booth = () => {
 
   const stopCamera = () => {
     if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach((track) => track.stop());
       setStream(null);
     }
     if (videoRef.current) {
-      videoRef.current.srcObject = null;
+      const v = videoRef.current;
+      try { v.pause(); } catch (_) {}
+      try { (v as any).srcObject = null; } catch (_) {}
+      try { v.load(); } catch (_) {}
     }
     setCameraActive(false);
     toast.info("Camera deactivated");
@@ -90,7 +113,7 @@ const Booth = () => {
           ctx.scale(-1, 1);
         }
         
-        ctx.drawImage(video, 0, 0);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
         // Restore context state
         ctx.restore();
@@ -264,7 +287,7 @@ const Booth = () => {
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-full object-cover animate-fade-in"
+                    className="absolute inset-0 w-full h-full object-cover animate-fade-in"
                     style={{
                       transform: mirrorCamera ? 'scaleX(-1)' : 'scaleX(1)',
                     }}
