@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      booth_settings: {
+        Row: {
+          caption: string | null
+          event_name: string | null
+          id: string
+          updated_at: string | null
+          watermark: string | null
+        }
+        Insert: {
+          caption?: string | null
+          event_name?: string | null
+          id?: string
+          updated_at?: string | null
+          watermark?: string | null
+        }
+        Update: {
+          caption?: string | null
+          event_name?: string | null
+          id?: string
+          updated_at?: string | null
+          watermark?: string | null
+        }
+        Relationships: []
+      }
+      photos: {
+        Row: {
+          approved: boolean | null
+          created_at: string | null
+          id: string
+          image_url: string
+        }
+        Insert: {
+          approved?: boolean | null
+          created_at?: string | null
+          id?: string
+          image_url: string
+        }
+        Update: {
+          approved?: boolean | null
+          created_at?: string | null
+          id?: string
+          image_url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
