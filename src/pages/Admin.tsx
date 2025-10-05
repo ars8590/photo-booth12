@@ -33,7 +33,7 @@ const Admin = () => {
       .from('booth_settings')
       .select('*')
       .limit(1)
-      .single();
+      .maybeSingle();
     if (data) {
       setSettings(data);
       setEventName(data.event_name);
@@ -43,14 +43,19 @@ const Admin = () => {
   };
 
   const exportAllPhotos = async () => {
+    if (photos.length === 0) {
+      toast.error("No photos to export");
+      return;
+    }
+    
     toast.info("Preparing photos for export...");
     photos.forEach((photo, index) => {
       setTimeout(() => {
         const link = document.createElement("a");
         link.href = photo.image_url;
-        link.download = `photo-${index + 1}.png`;
+        link.download = `vibranium-photo-${index + 1}.png`;
         link.click();
-      }, index * 100);
+      }, index * 200);
     });
     toast.success(`Exporting ${photos.length} photos!`);
   };

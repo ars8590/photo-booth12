@@ -28,7 +28,7 @@ const Feed = () => {
     
     // Subscribe to new photos
     const channel = supabase
-      .channel('photos-channel')
+      .channel('schema-db-changes')
       .on(
         'postgres_changes',
         {
