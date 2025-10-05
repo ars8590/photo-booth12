@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera, Upload, Download, RotateCcw } from "lucide-react";
+import { Camera, Upload, Download, RotateCcw, FlipHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
@@ -11,6 +11,7 @@ const Booth = () => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [mirrorCamera, setMirrorCamera] = useState(true);
 
   useEffect(() => {
     startCamera();
@@ -24,7 +25,12 @@ const Booth = () => {
   const startCamera = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: 1280, height: 720 }
+        video: { 
+          facingMode: "user",
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          aspectRatio: { ideal: 16/9 }
+        }
       });
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
@@ -46,6 +52,11 @@ const Booth = () => {
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext("2d");
       if (ctx) {
+        // Mirror the image if mirror mode is enabled
+        if (mirrorCamera) {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
         ctx.drawImage(video, 0, 0);
         const imageData = canvas.toDataURL("image/png");
         setCapturedImage(imageData);
@@ -203,17 +214,30 @@ const Booth = () => {
                 playsInline
                 muted
                 className="w-full h-full object-cover"
+                style={{
+                  transform: mirrorCamera ? 'scaleX(-1)' : 'scaleX(1)',
+                }}
               />
               <canvas ref={canvasRef} className="hidden" />
               
               {/* Holographic Overlay */}
               <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-accent/10 pointer-events-none" />
               
+              {/* Mirror Toggle Button */}
+              <Button
+                onClick={() => setMirrorCamera(!mirrorCamera)}
+                size="icon"
+                variant="secondary"
+                className="absolute top-4 right-4 box-glow-blue backdrop-blur-sm bg-background/50 border border-primary/30 z-10"
+              >
+                <FlipHorizontal className={`w-5 h-5 ${mirrorCamera ? 'text-primary' : 'text-muted-foreground'}`} />
+              </Button>
+              
               {/* Corner Accents */}
-              <div className="absolute top-2 left-2 w-16 h-16 border-l-4 border-t-4 border-primary box-glow-blue" />
-              <div className="absolute top-2 right-2 w-16 h-16 border-r-4 border-t-4 border-primary box-glow-blue" />
-              <div className="absolute bottom-2 left-2 w-16 h-16 border-l-4 border-b-4 border-accent box-glow-purple" />
-              <div className="absolute bottom-2 right-2 w-16 h-16 border-r-4 border-b-4 border-accent box-glow-purple" />
+              <div className="absolute top-2 left-2 w-12 h-12 sm:w-16 sm:h-16 border-l-4 border-t-4 border-primary box-glow-blue" />
+              <div className="absolute top-2 right-2 w-12 h-12 sm:w-16 sm:h-16 border-r-4 border-t-4 border-primary box-glow-blue" />
+              <div className="absolute bottom-2 left-2 w-12 h-12 sm:w-16 sm:h-16 border-l-4 border-b-4 border-accent box-glow-purple" />
+              <div className="absolute bottom-2 right-2 w-12 h-12 sm:w-16 sm:h-16 border-r-4 border-b-4 border-accent box-glow-purple" />
             </>
           ) : (
             <div className="relative w-full h-full">
