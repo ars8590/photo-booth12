@@ -41,28 +41,51 @@ const Booth = () => {
         video.muted = true;
         (video as any).srcObject = mediaStream;
 
-        // Wait for metadata to ensure dimensions are available
-        await new Promise<void>((resolve) => {
-          const ready = () => resolve();
-          if (video.readyState >= 1 && video.videoWidth > 0) resolve();
-          else video.addEventListener("loadedmetadata", ready, { once: true });
+        // Wait for video to have valid dimensions
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error("Video timeout")), 5000);
+          
+          const checkReady = () => {
+            if (video.videoWidth > 0 && video.videoHeight > 0) {
+              clearTimeout(timeout);
+              resolve();
+            }
+          };
+
+          video.addEventListener("loadedmetadata", checkReady, { once: true });
+          video.addEventListener("canplay", checkReady, { once: true });
+          
+          // Check immediately in case already loaded
+          if (video.readyState >= 2 && video.videoWidth > 0) {
+            clearTimeout(timeout);
+            resolve();
+          }
         });
 
-        // Start playback (allowed after user gesture)
+        // Start playback
         try {
           await video.play();
-        } catch (_) {
-          // Some browsers may reject play(); ignore and rely on next user gesture
+        } catch (playError) {
+          console.warn("Play error (may be safe to ignore):", playError);
+        }
+
+        // Final verification before activating
+        if (video.videoWidth > 0 && video.videoHeight > 0) {
+          setStream(mediaStream);
+          setCameraActive(true);
+          toast.success("Camera activated!");
+        } else {
+          throw new Error("Video dimensions not available");
         }
       }
-
-      setStream(mediaStream);
-      setCameraActive(true);
-      toast.success("Camera activated!");
     } catch (error) {
       console.error("Camera error:", error);
       toast.error("Camera access needed to capture your Vibranium moment.");
       setCameraActive(false);
+      // Clean up stream if it exists
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
     }
   };
 
