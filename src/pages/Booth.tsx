@@ -201,15 +201,25 @@ const Booth = () => {
       return;
     }
 
+    if (!cameraActive) {
+      toast.error("Please turn on the camera first.");
+      return;
+    }
+
     try {
       // Set canvas dimensions to match video
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!ctx) {
+        toast.error("Failed to get canvas context");
+        return;
+      }
 
-      // Draw video frame (flip if mirrored)
+      // Step 1: Draw video frame (flip if mirrored)
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
       if (mirrorCamera) {
         ctx.save();
         ctx.scale(-1, 1);
@@ -219,22 +229,29 @@ const Booth = () => {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       }
 
-      // Draw template overlay if exists
+      // Step 2: Draw template overlay on top of video if exists
       if (settings?.template_image_url) {
-        // Load template via blob to avoid CORS-taint on canvas
-        const resp = await fetch(settings.template_image_url);
-        const blob = await resp.blob();
-        const objectUrl = URL.createObjectURL(blob);
         try {
+          // Load template via blob to avoid CORS-taint on canvas
+          const resp = await fetch(settings.template_image_url);
+          if (!resp.ok) throw new Error('Failed to fetch template');
+          
+          const blob = await resp.blob();
+          const objectUrl = URL.createObjectURL(blob);
+          
           const templateImg = await new Promise<HTMLImageElement>((resolve, reject) => {
             const img = new Image();
             img.onload = () => resolve(img);
-            img.onerror = reject;
+            img.onerror = () => reject(new Error('Failed to load template image'));
             img.src = objectUrl;
           });
+          
+          // Draw template overlay covering the entire canvas
           ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
-        } finally {
           URL.revokeObjectURL(objectUrl);
+        } catch (templateError) {
+          console.error('Template overlay error:', templateError);
+          toast.error("Failed to apply template overlay");
         }
       } else if (settings) {
         // Draw caption and watermark if no template image
@@ -255,6 +272,7 @@ const Booth = () => {
         ctx.fillText(settings.watermark, 20, fontSize);
       }
 
+      // Step 3: Convert canvas to image
       const imageData = canvas.toDataURL("image/png");
       setCapturedImage(imageData);
       toast.success("Photo captured with template!");
