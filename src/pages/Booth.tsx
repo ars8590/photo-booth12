@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Camera, Upload, Download, RotateCcw, FlipHorizontal, Power } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface BoothSettings {
@@ -201,16 +201,21 @@ const Booth = () => {
 
       // Draw template overlay if exists
       if (settings?.template_image_url) {
-        const templateImg = new Image();
-        templateImg.crossOrigin = "anonymous";
-        
-        await new Promise((resolve, reject) => {
-          templateImg.onload = resolve;
-          templateImg.onerror = reject;
-          templateImg.src = settings.template_image_url!;
-        });
-
-        ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
+        // Load template via blob to avoid CORS-taint on canvas
+        const resp = await fetch(settings.template_image_url);
+        const blob = await resp.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        try {
+          const templateImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = objectUrl;
+          });
+          ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
       } else if (settings) {
         // Draw caption and watermark if no template image
         const fontSize = Math.floor(canvas.height / 20);
@@ -287,7 +292,9 @@ const Booth = () => {
       const link = document.createElement("a");
       link.href = url;
       link.download = fileName;
+      document.body.appendChild(link);
       link.click();
+      link.remove();
       URL.revokeObjectURL(url);
       
       toast.success("Photo saved and downloaded!");
