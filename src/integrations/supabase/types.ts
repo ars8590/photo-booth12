@@ -19,6 +19,7 @@ export type Database = {
           caption: string | null
           event_name: string | null
           id: string
+          template_image_url: string | null
           updated_at: string | null
           watermark: string | null
         }
@@ -26,6 +27,7 @@ export type Database = {
           caption?: string | null
           event_name?: string | null
           id?: string
+          template_image_url?: string | null
           updated_at?: string | null
           watermark?: string | null
         }
@@ -33,6 +35,7 @@ export type Database = {
           caption?: string | null
           event_name?: string | null
           id?: string
+          template_image_url?: string | null
           updated_at?: string | null
           watermark?: string | null
         }

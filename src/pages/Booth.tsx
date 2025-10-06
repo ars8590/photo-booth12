@@ -9,6 +9,7 @@ interface BoothSettings {
   event_name: string;
   caption: string;
   watermark: string;
+  template_image_url: string | null;
 }
 
 const Booth = () => {
@@ -28,7 +29,7 @@ const Booth = () => {
     const fetchSettings = async () => {
       const { data, error } = await supabase
         .from('booth_settings')
-        .select('event_name, caption, watermark')
+        .select('event_name, caption, watermark, template_image_url')
         .limit(1)
         .maybeSingle();
 
@@ -44,6 +45,27 @@ const Booth = () => {
     };
 
     fetchSettings();
+
+    // Setup realtime subscription for settings updates
+    const channel = supabase
+      .channel('booth-settings-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'booth_settings'
+        },
+        (payload) => {
+          setSettings(payload.new as BoothSettings);
+          toast.info('Template updated!');
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => {
@@ -296,20 +318,36 @@ const Booth = () => {
                   {/* Active Template Overlay */}
                   {settings ? (
                     <>
-                      {/* Caption Overlay */}
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-6 pointer-events-none z-20">
-                        <p className="text-center font-display text-2xl font-bold text-glow-blue">
-                          {settings.caption}
-                        </p>
-                        <p className="text-center font-display text-lg text-accent text-glow-purple">
-                          {settings.event_name}
-                        </p>
-                      </div>
+                      {/* Template Image Overlay - Full Coverage */}
+                      {settings.template_image_url && (
+                        <div className="absolute inset-0 pointer-events-none z-20">
+                          <img 
+                            src={settings.template_image_url} 
+                            alt="Template Overlay" 
+                            className="w-full h-full object-cover"
+                            style={{ mixBlendMode: 'normal' }}
+                          />
+                        </div>
+                      )}
 
-                      {/* Watermark */}
-                      <div className="absolute top-4 left-4 bg-background/50 backdrop-blur-sm px-3 py-1 rounded-lg border border-primary/30 pointer-events-none z-20">
-                        <p className="font-display text-xs text-primary">{settings.watermark}</p>
-                      </div>
+                      {/* Caption Overlay - Only if no template image */}
+                      {!settings.template_image_url && (
+                        <>
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-6 pointer-events-none z-20">
+                            <p className="text-center font-display text-2xl font-bold text-glow-blue">
+                              {settings.caption}
+                            </p>
+                            <p className="text-center font-display text-lg text-accent text-glow-purple">
+                              {settings.event_name}
+                            </p>
+                          </div>
+
+                          {/* Watermark */}
+                          <div className="absolute top-4 left-4 bg-background/50 backdrop-blur-sm px-3 py-1 rounded-lg border border-primary/30 pointer-events-none z-20">
+                            <p className="font-display text-xs text-primary">{settings.watermark}</p>
+                          </div>
+                        </>
+                      )}
                     </>
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center bg-background/80 pointer-events-none z-20">

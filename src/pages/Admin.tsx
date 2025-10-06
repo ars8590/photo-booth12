@@ -22,6 +22,7 @@ type BoothSettings = {
   event_name: string | null;
   caption: string | null;
   watermark: string | null;
+  template_image_url: string | null;
   updated_at: string | null;
 };
 
@@ -225,25 +226,66 @@ const Admin = () => {
     }
   };
 
-  const handleTemplateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTemplateUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const newTemplate: Template = {
-          id: Date.now().toString(),
-          name: file.name.replace(/\.[^/.]+$/, ""),
-          preview: event.target?.result as string,
-          active: false
-        };
-        setTemplates([...templates, newTemplate]);
-        toast.success("Template uploaded successfully!");
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error("Please upload an image file (PNG recommended)");
+      return;
+    }
+
+    if (!settings) {
+      toast.error("Settings not loaded");
+      return;
+    }
+
+    try {
+      toast.info("Uploading template...");
+
+      // Upload to storage
+      const fileName = `template-${Date.now()}.png`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('photos')
+        .upload(fileName, file, {
+          contentType: file.type,
+          cacheControl: '3600',
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('photos')
+        .getPublicUrl(fileName);
+
+      // Update booth settings with template URL
+      const { error: updateError } = await supabase
+        .from('booth_settings')
+        .update({
+          template_image_url: publicUrl,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', settings.id);
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      setSettings({ ...settings, template_image_url: publicUrl });
+      
+      toast.success("Template uploaded and activated!");
+      loadSettings(); // Refresh settings
+    } catch (error) {
+      console.error('Error uploading template:', error);
+      toast.error("Failed to upload template");
     }
   };
 
   const activateTemplate = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId);
+    if (!template) return;
+    
     setTemplates(templates.map(t => ({
       ...t,
       active: t.id === templateId
@@ -403,37 +445,22 @@ const Admin = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {templates.map((template, index) => (
-                  <Card key={index} className="p-4 bg-muted border-primary/30 hover:border-primary/60 transition-all">
+              {settings?.template_image_url ? (
+                <div className="mb-6">
+                  <h3 className="font-display text-lg font-semibold text-primary mb-3">Active Template</h3>
+                  <Card className="p-4 bg-muted border-primary/30">
                     <div className="aspect-video bg-gradient-metallic rounded-lg mb-3 flex items-center justify-center overflow-hidden">
-                      {template.preview ? (
-                        <img src={template.preview} alt={template.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <Image className="w-12 h-12 text-primary/50" />
-                      )}
+                      <img src={settings.template_image_url} alt="Active Template" className="w-full h-full object-contain" />
                     </div>
-                    <h3 className="font-display text-base md:text-lg font-semibold mb-2">{template.name}</h3>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="flex-1 min-h-[40px]"
-                        onClick={() => setPreviewTemplate(template)}
-                      >
-                        Preview
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        className={`flex-1 min-h-[40px] ${template.active ? 'box-glow-blue' : ''}`}
-                        onClick={() => activateTemplate(template.id)}
-                      >
-                        {template.active ? 'Active' : 'Activate'}
-                      </Button>
-                    </div>
+                    <p className="text-sm text-muted-foreground text-center">This template will overlay all captured photos</p>
                   </Card>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div className="mb-6 p-6 border-2 border-dashed border-primary/30 rounded-lg text-center">
+                  <Image className="w-12 h-12 text-primary/50 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">No template uploaded yet. Upload a transparent PNG template to overlay on photos.</p>
+                </div>
+              )}
             </Card>
           </TabsContent>
 
