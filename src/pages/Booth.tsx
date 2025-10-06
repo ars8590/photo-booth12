@@ -173,24 +173,62 @@ const Booth = () => {
   };
 
   const capturePhoto = async () => {
-    if (!previewContainerRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
     
-    if (videoRef.current && (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0)) {
+    if (!video || !canvas || video.videoWidth === 0 || video.videoHeight === 0) {
       toast.error("Camera not ready. Please wait a moment.");
       return;
     }
 
     try {
-      // Dynamically import html2canvas
-      const html2canvas = (await import('html2canvas')).default;
+      // Set canvas dimensions to match video
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
       
-      // Capture the entire preview container including overlay
-      const canvas = await html2canvas(previewContainerRef.current, {
-        backgroundColor: '#000000',
-        scale: 2, // Higher quality
-        useCORS: true,
-        logging: false,
-      });
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Draw video frame (flip if mirrored)
+      if (mirrorCamera) {
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+        ctx.restore();
+      } else {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      }
+
+      // Draw template overlay if exists
+      if (settings?.template_image_url) {
+        const templateImg = new Image();
+        templateImg.crossOrigin = "anonymous";
+        
+        await new Promise((resolve, reject) => {
+          templateImg.onload = resolve;
+          templateImg.onerror = reject;
+          templateImg.src = settings.template_image_url!;
+        });
+
+        ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
+      } else if (settings) {
+        // Draw caption and watermark if no template image
+        const fontSize = Math.floor(canvas.height / 20);
+        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.fillStyle = '#00D9FF';
+        ctx.textAlign = 'center';
+        ctx.fillText(settings.caption, canvas.width / 2, canvas.height - fontSize * 3);
+        
+        ctx.font = `${Math.floor(fontSize * 0.7)}px Arial`;
+        ctx.fillStyle = '#9333EA';
+        ctx.fillText(settings.event_name, canvas.width / 2, canvas.height - fontSize * 1.5);
+        
+        // Watermark
+        ctx.font = `${Math.floor(fontSize * 0.5)}px Arial`;
+        ctx.fillStyle = '#00D9FF';
+        ctx.textAlign = 'left';
+        ctx.fillText(settings.watermark, 20, fontSize);
+      }
 
       const imageData = canvas.toDataURL("image/png");
       setCapturedImage(imageData);
