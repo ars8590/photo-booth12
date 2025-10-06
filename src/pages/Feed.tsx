@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Download, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, Photo } from "@/lib/supabase";
 import { toast } from "sonner";
 
 // Sample photos for demonstration
@@ -17,8 +17,6 @@ const samplePhotos = [
   "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400&h=400&fit=crop",
   "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&h=400&fit=crop",
 ];
-
-type Photo = { id: string; image_url: string; created_at: string; approved: boolean };
 
 const Feed = () => {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);

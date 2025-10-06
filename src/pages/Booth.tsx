@@ -2,74 +2,18 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Camera, Upload, Download, RotateCcw, FlipHorizontal, Power } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { useIsMobile } from "@/hooks/use-mobile";
-
-interface BoothSettings {
-  event_name: string;
-  caption: string;
-  watermark: string;
-  template_image_url: string | null;
-}
 
 const Booth = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const previewContainerRef = useRef<HTMLDivElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [mirrorCamera, setMirrorCamera] = useState(true);
-  const [settings, setSettings] = useState<BoothSettings | null>(null);
   const isMobile = useIsMobile();
-  const [templateVersion, setTemplateVersion] = useState(0);
-
-  // Fetch booth settings
-  useEffect(() => {
-    const fetchSettings = async () => {
-      const { data, error } = await supabase
-        .from('booth_settings')
-        .select('event_name, caption, watermark, template_image_url')
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching settings:', error);
-        toast.error('Failed to load booth settings');
-        return;
-      }
-
-      if (data) {
-        setSettings(data);
-        setTemplateVersion(Date.now());
-      }
-    };
-
-    fetchSettings();
-
-    // Setup realtime subscription for settings updates
-    const channel = supabase
-      .channel('booth-settings-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'booth_settings'
-        },
-        (payload) => {
-          setSettings(payload.new as BoothSettings);
-          setTemplateVersion(Date.now());
-          toast.info('Template updated!');
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -86,32 +30,15 @@ const Booth = () => {
       const idealWidth = isMobile ? 1080 : 1920;
       const idealHeight = isMobile ? 1920 : 1080;
       
-      let mediaStream: MediaStream | null = null;
-      let lastError: any = null;
-      
-      const constraintsList: MediaStreamConstraints[] = [
-        {
-          video: {
-            facingMode: { ideal: 'user' },
-            width: { ideal: idealWidth },
-            height: { ideal: idealHeight },
-          },
-          audio: false,
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "user" },
+          width: { ideal: idealWidth },
+          height: { ideal: idealHeight },
+          aspectRatio: { ideal: aspectRatio },
         },
-        { video: { facingMode: 'user' }, audio: false } as any,
-        { video: true, audio: false },
-      ];
-
-      for (const c of constraintsList) {
-        try {
-          mediaStream = await navigator.mediaDevices.getUserMedia(c);
-          break;
-        } catch (e) {
-          lastError = e;
-          continue;
-        }
-      }
-      if (!mediaStream) throw lastError!;
+        audio: false,
+      });
 
       const video = videoRef.current;
       if (video) {
@@ -192,247 +119,163 @@ const Booth = () => {
     }
   };
 
-  const capturePhoto = async () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    
-    if (!video || !canvas || video.videoWidth === 0 || video.videoHeight === 0) {
-      toast.error("Camera not ready. Please wait a moment.");
-      return;
-    }
-
-    if (!cameraActive) {
-      toast.error("Please turn on the camera first.");
-      return;
-    }
-
-    try {
-      // Set canvas dimensions to match video
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+  const capturePhoto = () => {
+    if (canvasRef.current && videoRef.current) {
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
       
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        toast.error("Failed to get canvas context");
+      // Check if video is ready
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        toast.error("Camera not ready. Please wait a moment.");
         return;
       }
-
-      // Step 1: Draw video frame using ImageCapture when available, fallback to <video>
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      let drewVideo = false;
-      const track = stream?.getVideoTracks?.()[0];
-      const ImageCaptureCtor = (window as any).ImageCapture;
-      if (track && ImageCaptureCtor) {
-        try {
-          const imageCapture = new ImageCaptureCtor(track);
-          const bitmap: ImageBitmap = await imageCapture.grabFrame();
-          // Resize canvas to frame size for best quality
-          canvas.width = bitmap.width;
-          canvas.height = bitmap.height;
-
-          if (mirrorCamera) {
-            ctx.save();
-            ctx.scale(-1, 1);
-            ctx.drawImage(bitmap as any, -canvas.width, 0, canvas.width, canvas.height);
-            ctx.restore();
-          } else {
-            ctx.drawImage(bitmap as any, 0, 0, canvas.width, canvas.height);
-          }
-          drewVideo = true;
-        } catch (e) {
-          console.warn('ImageCapture failed, falling back to video element', e);
-        }
-      }
-
-      if (!drewVideo) {
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        // Save context state
+        ctx.save();
+        
+        // Mirror the image if mirror mode is enabled
         if (mirrorCamera) {
-          ctx.save();
+          ctx.translate(canvas.width, 0);
           ctx.scale(-1, 1);
-          ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-          ctx.restore();
-        } else {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         }
-      }
-
-      // Step 2: Draw template overlay on top of video if exists
-      if (settings?.template_image_url) {
-        try {
-          // Load template via blob to avoid CORS-taint on canvas
-          const resp = await fetch(settings.template_image_url);
-          if (!resp.ok) throw new Error('Failed to fetch template');
-          
-          const blob = await resp.blob();
-          const objectUrl = URL.createObjectURL(blob);
-          
-          const templateImg = await new Promise<HTMLImageElement>((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => resolve(img);
-            img.onerror = () => reject(new Error('Failed to load template image'));
-            img.src = objectUrl;
-          });
-          
-          // Draw template overlay covering the entire canvas
-          ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
-          URL.revokeObjectURL(objectUrl);
-        } catch (templateError) {
-          console.error('Template overlay error:', templateError);
-          toast.error("Failed to apply template overlay");
-        }
-      } else if (settings) {
-        // Draw caption and watermark if no template image
-        const fontSize = Math.floor(canvas.height / 20);
-        ctx.font = `bold ${fontSize}px Arial`;
-        ctx.fillStyle = '#00D9FF';
-        ctx.textAlign = 'center';
-        ctx.fillText(settings.caption, canvas.width / 2, canvas.height - fontSize * 3);
         
-        ctx.font = `${Math.floor(fontSize * 0.7)}px Arial`;
-        ctx.fillStyle = '#9333EA';
-        ctx.fillText(settings.event_name, canvas.width / 2, canvas.height - fontSize * 1.5);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
-        // Watermark
-        ctx.font = `${Math.floor(fontSize * 0.5)}px Arial`;
-        ctx.fillStyle = '#00D9FF';
-        ctx.textAlign = 'left';
-        ctx.fillText(settings.watermark, 20, fontSize);
+        // Restore context state
+        ctx.restore();
+        
+        const imageData = canvas.toDataURL("image/png");
+        setCapturedImage(imageData);
+        toast.success("Photo captured!");
       }
-
-      // Step 3: Convert canvas to image
-      const imageData = canvas.toDataURL("image/png");
-      setCapturedImage(imageData);
-      toast.success("Photo captured with template!");
-    } catch (error) {
-      console.error('Capture error:', error);
-      toast.error("Failed to capture photo");
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      // Set a consistent target size based on layout aspect ratio
-      const targetW = isMobile ? 1080 : 1920;
-      const targetH = isMobile ? 1920 : 1080;
-      canvas.width = targetW;
-      canvas.height = targetH;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      // Load uploaded photo
-      const fileUrl = URL.createObjectURL(file);
-      const photo = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error('Failed to load uploaded image'));
-        img.src = fileUrl;
-      });
-
-      // Draw uploaded photo to cover canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const scale = Math.max(canvas.width / photo.width, canvas.height / photo.height);
-      const dw = photo.width * scale;
-      const dh = photo.height * scale;
-      const dx = (canvas.width - dw) / 2;
-      const dy = (canvas.height - dh) / 2;
-      ctx.drawImage(photo, dx, dy, dw, dh);
-      URL.revokeObjectURL(fileUrl);
-
-      // Overlay template if available
-      if (settings?.template_image_url) {
-        const resp = await fetch(settings.template_image_url);
-        if (resp.ok) {
-          const blob = await resp.blob();
-          const tplUrl = URL.createObjectURL(blob);
-          const overlay = await new Promise<HTMLImageElement>((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => resolve(img);
-            img.onerror = () => reject(new Error('Failed to load template image'));
-            img.src = tplUrl;
-          });
-          ctx.drawImage(overlay, 0, 0, canvas.width, canvas.height);
-          URL.revokeObjectURL(tplUrl);
-        }
-      } else if (settings) {
-        // Draw captions if no template image
-        const fontSize = Math.floor(canvas.height / 20);
-        ctx.font = `bold ${fontSize}px Arial`;
-        ctx.fillStyle = '#00D9FF';
-        ctx.textAlign = 'center';
-        ctx.fillText(settings.caption, canvas.width / 2, canvas.height - fontSize * 3);
-        
-        ctx.font = `${Math.floor(fontSize * 0.7)}px Arial`;
-        ctx.fillStyle = '#9333EA';
-        ctx.fillText(settings.event_name, canvas.width / 2, canvas.height - fontSize * 1.5);
-        
-        ctx.font = `${Math.floor(fontSize * 0.5)}px Arial`;
-        ctx.fillStyle = '#00D9FF';
-        ctx.textAlign = 'left';
-        ctx.fillText(settings.watermark, 20, fontSize);
-      }
-
-      const imageData = canvas.toDataURL('image/png');
-      setCapturedImage(imageData);
-      toast.success('Photo uploaded and templated!');
-    } catch (err) {
-      console.error('Upload compose error:', err);
-      toast.error('Failed to compose uploaded photo');
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setCapturedImage(event.target?.result as string);
+        toast.success("Photo uploaded!");
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const downloadPhoto = async () => {
-    if (!capturedImage || !settings) return;
+    if (!capturedImage) return;
 
-    try {
-      // Convert base64 to blob
-      const response = await fetch(capturedImage);
-      const blob = await response.blob();
+    const downloadCanvas = document.createElement("canvas");
+    const ctx = downloadCanvas.getContext("2d");
+    if (!ctx) return;
 
-      // Upload to storage
-      const fileName = `${settings.event_name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.png`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('photos')
-        .upload(fileName, blob, {
-          contentType: 'image/png',
-          cacheControl: '3600',
-        });
+    // Template dimensions (square format)
+    const templateSize = 1080;
+    const borderWidth = 20;
+    const photoMargin = 100;
+    const photoSize = templateSize - (photoMargin * 2);
 
-      if (uploadError) throw uploadError;
+    downloadCanvas.width = templateSize;
+    downloadCanvas.height = templateSize;
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('photos')
-        .getPublicUrl(fileName);
+    // Load the captured image
+    const img = new Image();
+    img.onload = async () => {
+      // Draw black background
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, templateSize, templateSize);
 
-      // Save to database
-      const { error: dbError } = await supabase
-        .from('photos')
-        .insert({ image_url: publicUrl });
+      // Draw cyan glowing border
+      ctx.strokeStyle = "#00D9FF";
+      ctx.lineWidth = borderWidth;
+      ctx.shadowColor = "#00D9FF";
+      ctx.shadowBlur = 30;
+      ctx.strokeRect(borderWidth / 2, borderWidth / 2, templateSize - borderWidth, templateSize - borderWidth);
 
-      if (dbError) throw dbError;
+      // Reset shadow for photo
+      ctx.shadowBlur = 0;
 
-      // Download the file
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      
-      toast.success("Photo saved and downloaded!");
-    } catch (error) {
-      console.error('Error saving photo:', error);
-      toast.error("Failed to save photo");
-    }
+      // Draw the user's photo in the center
+      const imgAspect = img.width / img.height;
+      let drawWidth = photoSize;
+      let drawHeight = photoSize;
+      let offsetX = photoMargin;
+      let offsetY = photoMargin;
+
+      // Maintain aspect ratio
+      if (imgAspect > 1) {
+        drawHeight = photoSize / imgAspect;
+        offsetY = photoMargin + (photoSize - drawHeight) / 2;
+      } else {
+        drawWidth = photoSize * imgAspect;
+        offsetX = photoMargin + (photoSize - drawWidth) / 2;
+      }
+
+      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+
+      // Draw bottom text
+      ctx.fillStyle = "#00D9FF";
+      ctx.shadowColor = "#00D9FF";
+      ctx.shadowBlur = 20;
+      ctx.font = "bold 48px 'Orbitron', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("I Have Participated – Vibranium 5.0", templateSize / 2, templateSize - 80);
+
+      // Draw watermark
+      ctx.font = "bold 24px 'Orbitron', sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText("Vibranium 5.0", templateSize - 40, templateSize - 40);
+
+      // Convert to blob and save to database
+      downloadCanvas.toBlob(async (blob) => {
+        if (blob) {
+          try {
+            // Upload to storage
+            const fileName = `vibranium-5.0-${Date.now()}.png`;
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('photos')
+              .upload(fileName, blob, {
+                contentType: 'image/png',
+                cacheControl: '3600',
+              });
+
+            if (uploadError) throw uploadError;
+
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+              .from('photos')
+              .getPublicUrl(fileName);
+
+            // Save to database
+            const { error: dbError } = await supabase
+              .from('photos')
+              .insert({ image_url: publicUrl });
+
+            if (dbError) throw dbError;
+
+            // Download the file
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = fileName;
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            toast.success("Photo saved and downloaded!");
+          } catch (error) {
+            console.error('Error saving photo:', error);
+            toast.error("Failed to save photo");
+          }
+        }
+      }, "image/png");
+    };
+
+    img.src = capturedImage;
   };
 
   const retakePhoto = async () => {
@@ -453,101 +296,28 @@ const Booth = () => {
 
         {/* Main Camera/Photo View */}
         <div className="relative rounded-2xl overflow-hidden border-4 border-glow aspect-[9/16] md:aspect-video mb-6 bg-metallic">
-          {!capturedImage ? (
+        {!capturedImage ? (
             <>
-              {/* Inner capture container - only video + template overlay */}
-              <div 
-                ref={previewContainerRef}
-                className="absolute inset-0"
-              >
-                {/* Video Element - Always rendered */}
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
-                    cameraActive ? 'opacity-100 animate-fade-in' : 'opacity-0 pointer-events-none'
-                  }`}
-                  style={{
-                    transform: mirrorCamera ? 'scaleX(-1)' : 'scaleX(1)',
-                  }}
-                />
-                <canvas ref={canvasRef} className="hidden" />
-
-                {cameraActive && (
-                  <>
-                    {/* Holographic Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-accent/10 pointer-events-none" />
-                    
-                    {/* Active Template Overlay */}
-                    {settings ? (
-                      <>
-                        {/* Template Image Overlay - Full Coverage */}
-                          {settings.template_image_url && (
-                            <div className="absolute inset-0 pointer-events-none z-20">
-                              <img 
-                                key={templateVersion}
-                                src={`${settings.template_image_url}?v=${templateVersion}`}
-                                alt="Template Overlay" 
-                                className="w-full h-full object-cover"
-                                style={{ mixBlendMode: 'normal' }}
-                              />
-                            </div>
-                          )}
-
-                        {/* Caption Overlay - Only if no template image */}
-                        {!settings.template_image_url && (
-                          <>
-                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-6 pointer-events-none z-20">
-                              <p className="text-center font-display text-2xl font-bold text-glow-blue">
-                                {settings.caption}
-                              </p>
-                              <p className="text-center font-display text-lg text-accent text-glow-purple">
-                                {settings.event_name}
-                              </p>
-                            </div>
-
-                            {/* Watermark */}
-                            <div className="absolute top-4 left-4 bg-background/50 backdrop-blur-sm px-3 py-1 rounded-lg border border-primary/30 pointer-events-none z-20">
-                              <p className="font-display text-xs text-primary">{settings.watermark}</p>
-                            </div>
-                          </>
-                        )}
-                      </>
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center bg-background/80 pointer-events-none z-20">
-                        <p className="font-display text-sm text-muted-foreground">No active template set by admin</p>
-                      </div>
-                    )}
-                  </>
-                )}
-                
-                {!cameraActive && (
-                  /* Camera Off Placeholder */
-                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5 animate-fade-in">
-                    <div className="text-center space-y-4 px-4">
-                      <div className="relative inline-block">
-                        <Camera className="w-20 h-20 md:w-32 md:h-32 text-primary/30" />
-                        <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full animate-pulse" />
-                      </div>
-                      <p className="font-display text-lg md:text-2xl text-primary text-glow-blue">
-                        Camera Disabled
-                      </p>
-                      <p className="text-sm md:text-base text-accent text-glow-purple">
-                        Tap Power to Activate
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* UI Controls - outside capture area */}
+              {/* Video Element - Always rendered */}
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                  cameraActive ? 'opacity-100 animate-fade-in' : 'opacity-0 pointer-events-none'
+                }`}
+                style={{
+                  transform: mirrorCamera ? 'scaleX(-1)' : 'scaleX(1)',
+                }}
+              />
+              <canvas ref={canvasRef} className="hidden" />
+              
               {/* Camera Power Toggle Button */}
               <Button
                 onClick={toggleCamera}
                 size="icon"
-                className={`absolute top-4 left-4 backdrop-blur-sm border z-30 transition-all duration-300 hover:scale-110 ${
+                className={`absolute top-4 left-4 backdrop-blur-sm border z-10 transition-all duration-300 hover:scale-110 ${
                   cameraActive 
                     ? 'bg-primary/20 border-primary shadow-[0_0_20px_rgba(0,217,255,0.6)] text-primary' 
                     : 'bg-background/50 border-muted-foreground/20 text-muted-foreground/50'
@@ -556,27 +326,68 @@ const Booth = () => {
                 <Power className={`w-5 h-5 transition-all duration-300 ${cameraActive ? 'animate-pulse' : ''}`} />
               </Button>
 
-              {/* Mirror Toggle Button */}
               {cameraActive && (
-                <Button
-                  onClick={() => setMirrorCamera(!mirrorCamera)}
-                  size="icon"
-                  variant="secondary"
-                  className="absolute top-4 right-4 box-glow-blue backdrop-blur-sm bg-background/50 border border-primary/30 z-30"
-                >
-                  <FlipHorizontal className={`w-5 h-5 ${mirrorCamera ? 'text-primary' : 'text-muted-foreground'}`} />
-                </Button>
+                <>
+                  {/* Holographic Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-accent/10 pointer-events-none" />
+                  
+                  {/* Mirror Toggle Button */}
+                  <Button
+                    onClick={() => setMirrorCamera(!mirrorCamera)}
+                    size="icon"
+                    variant="secondary"
+                    className="absolute top-4 right-4 box-glow-blue backdrop-blur-sm bg-background/50 border border-primary/30 z-10"
+                  >
+                    <FlipHorizontal className={`w-5 h-5 ${mirrorCamera ? 'text-primary' : 'text-muted-foreground'}`} />
+                  </Button>
+                </>
+              )}
+              
+              {!cameraActive && (
+                /* Camera Off Placeholder */
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5 animate-fade-in">
+                  <div className="text-center space-y-4 px-4">
+                    <div className="relative inline-block">
+                      <Camera className="w-20 h-20 md:w-32 md:h-32 text-primary/30" />
+                      <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full animate-pulse" />
+                    </div>
+                    <p className="font-display text-lg md:text-2xl text-primary text-glow-blue">
+                      Camera Disabled
+                    </p>
+                    <p className="text-sm md:text-base text-accent text-glow-purple">
+                      Tap Power to Activate
+                    </p>
+                  </div>
+                </div>
               )}
               
               {/* Corner Accents */}
-              <div className="absolute top-2 left-2 w-12 h-12 sm:w-16 sm:h-16 border-l-4 border-t-4 border-primary box-glow-blue pointer-events-none" />
-              <div className="absolute top-2 right-2 w-12 h-12 sm:w-16 sm:h-16 border-r-4 border-t-4 border-primary box-glow-blue pointer-events-none" />
-              <div className="absolute bottom-2 left-2 w-12 h-12 sm:w-16 sm:h-16 border-l-4 border-b-4 border-accent box-glow-purple pointer-events-none" />
-              <div className="absolute bottom-2 right-2 w-12 h-12 sm:w-16 sm:h-16 border-r-4 border-b-4 border-accent box-glow-purple pointer-events-none" />
+              <div className="absolute top-2 left-2 w-12 h-12 sm:w-16 sm:h-16 border-l-4 border-t-4 border-primary box-glow-blue" />
+              <div className="absolute top-2 right-2 w-12 h-12 sm:w-16 sm:h-16 border-r-4 border-t-4 border-primary box-glow-blue" />
+              <div className="absolute bottom-2 left-2 w-12 h-12 sm:w-16 sm:h-16 border-l-4 border-b-4 border-accent box-glow-purple" />
+              <div className="absolute bottom-2 right-2 w-12 h-12 sm:w-16 sm:h-16 border-r-4 border-b-4 border-accent box-glow-purple" />
             </>
           ) : (
             <div className="relative w-full h-full">
               <img src={capturedImage} alt="Captured" className="w-full h-full object-cover" />
+              
+              {/* Vibranium Template Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-b from-primary/20 via-transparent to-accent/20" />
+              
+              {/* Caption Overlay */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-6">
+                <p className="text-center font-display text-2xl font-bold text-glow-blue">
+                  I HAVE PARTICIPATED
+                </p>
+                <p className="text-center font-display text-lg text-accent text-glow-purple">
+                  VIBRANIUM 5.0
+                </p>
+              </div>
+
+              {/* Watermark */}
+              <div className="absolute top-4 right-4 bg-background/50 backdrop-blur-sm px-3 py-1 rounded-lg border border-primary/30">
+                <p className="font-display text-xs text-primary">V5.0</p>
+              </div>
             </div>
           )}
         </div>

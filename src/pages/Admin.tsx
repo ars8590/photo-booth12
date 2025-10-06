@@ -22,17 +22,14 @@ type BoothSettings = {
   event_name: string | null;
   caption: string | null;
   watermark: string | null;
-  template_image_url: string | null;
   updated_at: string | null;
 };
 
 type Template = {
   id: string;
   name: string;
-  image_url: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  preview: string;
+  active: boolean;
 };
 
 const Admin = () => {
@@ -43,7 +40,9 @@ const Admin = () => {
   const [watermark, setWatermark] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([
+    { id: '1', name: 'Vibranium Classic', preview: '', active: true }
+  ]);
   const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -75,7 +74,7 @@ const Admin = () => {
 
   const loadData = async () => {
     setLoading(true);
-    await Promise.all([loadPhotos(), loadSettings(), loadTemplates()]);
+    await Promise.all([loadPhotos(), loadSettings()]);
     setLoading(false);
   };
 
@@ -112,21 +111,6 @@ const Admin = () => {
     } catch (error) {
       console.error('Error loading settings:', error);
       toast.error("Failed to load settings");
-    }
-  };
-
-  const loadTemplates = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('templates' as any)
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      if (data) setTemplates(data as unknown as Template[]);
-    } catch (error) {
-      console.error('Error loading templates:', error);
-      toast.error("Failed to load templates");
     }
   };
 
@@ -241,113 +225,30 @@ const Admin = () => {
     }
   };
 
-  const handleTemplateUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTemplateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error("Please upload an image file (PNG recommended)");
-      return;
-    }
-
-    try {
-      toast.info("Uploading template...");
-
-      // Upload to storage
-      const fileName = `template-${Date.now()}.png`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('photos')
-        .upload(fileName, file, {
-          contentType: file.type,
-          cacheControl: '3600',
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('photos')
-        .getPublicUrl(fileName);
-
-      // Prompt for template name
-      const templateName = prompt("Enter template name:") || `Template ${Date.now()}`;
-
-      // Insert into templates table
-      const { error: insertError } = await supabase
-        .from('templates' as any)
-        .insert({
-          name: templateName,
-          image_url: publicUrl,
-          is_active: false
-        });
-
-      if (insertError) throw insertError;
-      
-      toast.success("Template uploaded successfully!");
-      loadTemplates();
-      
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    } catch (error) {
-      console.error('Error uploading template:', error);
-      toast.error("Failed to upload template");
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const newTemplate: Template = {
+          id: Date.now().toString(),
+          name: file.name.replace(/\.[^/.]+$/, ""),
+          preview: event.target?.result as string,
+          active: false
+        };
+        setTemplates([...templates, newTemplate]);
+        toast.success("Template uploaded successfully!");
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  const activateTemplate = async (templateId: string) => {
-    try {
-      // Deactivate all templates
-      await supabase
-        .from('templates' as any)
-        .update({ is_active: false })
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
-      // Activate selected template
-      const { error } = await supabase
-        .from('templates' as any)
-        .update({ is_active: true })
-        .eq('id', templateId);
-
-      if (error) throw error;
-
-      toast.success("Template activated!");
-      loadTemplates();
-    } catch (error) {
-      console.error('Error activating template:', error);
-      toast.error("Failed to activate template");
-    }
-  };
-
-  const deleteTemplate = async (templateId: string, imageUrl: string) => {
-    try {
-      // Extract file path from URL
-      const urlParts = imageUrl.split('/');
-      const fileName = urlParts[urlParts.length - 1];
-
-      // Delete from storage
-      const { error: storageError } = await supabase.storage
-        .from('photos')
-        .remove([fileName]);
-
-      if (storageError) throw storageError;
-
-      // Delete from database
-      const { error: dbError } = await supabase
-        .from('templates' as any)
-        .delete()
-        .eq('id', templateId);
-
-      if (dbError) throw dbError;
-
-      toast.success("Template deleted successfully!");
-      loadTemplates();
-    } catch (error) {
-      console.error('Error deleting template:', error);
-      toast.error("Failed to delete template");
-    }
+  const activateTemplate = (templateId: string) => {
+    setTemplates(templates.map(t => ({
+      ...t,
+      active: t.id === templateId
+    })));
+    toast.success("Template activated!");
   };
 
   const stats = [
@@ -491,7 +392,7 @@ const Admin = () => {
                 <h2 className="font-display text-xl md:text-2xl font-bold text-primary">Template Management</h2>
                 <Button className="box-glow-purple min-h-[48px] w-full sm:w-auto" onClick={() => fileInputRef.current?.click()}>
                   <Image className="w-4 h-4 mr-2" />
-                  <span className="text-sm md:text-base">Upload New Template</span>
+                  <span className="text-sm md:text-base">Upload Template</span>
                 </Button>
                 <input
                   ref={fileInputRef}
@@ -503,57 +404,35 @@ const Admin = () => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {templates.length === 0 ? (
-                  <div className="col-span-full p-8 border-2 border-dashed border-primary/30 rounded-lg text-center">
-                    <Image className="w-12 h-12 text-primary/50 mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground">No templates yet. Upload a transparent PNG template to get started.</p>
-                  </div>
-                ) : (
-                  templates.map((template) => (
-                    <Card key={template.id} className={`p-4 bg-muted border-2 transition-all ${template.is_active ? 'border-primary shadow-lg shadow-primary/20' : 'border-primary/20'}`}>
-                      <div className="aspect-video bg-gradient-metallic rounded-lg mb-3 flex items-center justify-center overflow-hidden">
-                        <img src={template.image_url} alt={template.name} className="w-full h-full object-contain" />
-                      </div>
-                      <h3 className="font-semibold text-sm mb-2 truncate">{template.name}</h3>
-                      {template.is_active && (
-                        <p className="text-xs text-primary mb-2">✓ Active Template</p>
+                {templates.map((template, index) => (
+                  <Card key={index} className="p-4 bg-muted border-primary/30 hover:border-primary/60 transition-all">
+                    <div className="aspect-video bg-gradient-metallic rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+                      {template.preview ? (
+                        <img src={template.preview} alt={template.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Image className="w-12 h-12 text-primary/50" />
                       )}
-                      <div className="flex gap-2">
-                        {!template.is_active && (
-                          <Button 
-                            size="sm" 
-                            className="flex-1"
-                            onClick={() => activateTemplate(template.id)}
-                          >
-                            Activate
-                          </Button>
-                        )}
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="destructive" className="flex-1">
-                              <Trash2 className="w-4 h-4 mr-1" />
-                              Delete
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete {template.name}?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete this template.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteTemplate(template.id, template.image_url)}>
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </Card>
-                  ))
-                )}
+                    </div>
+                    <h3 className="font-display text-base md:text-lg font-semibold mb-2">{template.name}</h3>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="flex-1 min-h-[40px]"
+                        onClick={() => setPreviewTemplate(template)}
+                      >
+                        Preview
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        className={`flex-1 min-h-[40px] ${template.active ? 'box-glow-blue' : ''}`}
+                        onClick={() => activateTemplate(template.id)}
+                      >
+                        {template.active ? 'Active' : 'Activate'}
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
               </div>
             </Card>
           </TabsContent>
@@ -633,8 +512,8 @@ const Admin = () => {
             <DialogTitle className="font-display text-glow-blue">{previewTemplate?.name}</DialogTitle>
           </DialogHeader>
           <div className="aspect-video bg-gradient-metallic rounded-lg flex items-center justify-center overflow-hidden">
-            {previewTemplate?.image_url ? (
-              <img src={previewTemplate.image_url} alt={previewTemplate.name} className="w-full h-full object-cover" />
+            {previewTemplate?.preview ? (
+              <img src={previewTemplate.preview} alt={previewTemplate.name} className="w-full h-full object-cover" />
             ) : (
               <Image className="w-24 h-24 text-primary/50" />
             )}
