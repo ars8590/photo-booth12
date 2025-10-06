@@ -284,7 +284,7 @@ const Booth = () => {
           <h1 className="font-display text-3xl sm:text-4xl md:text-6xl font-bold text-glow-blue mb-2">
             VIBRANIUM 5.0
           </h1>
-          <p className="text-muted-foreground text-sm md:text-lg">AI-Powered Photo Booth Experience</p>
+          
         </div>
 
         {/* Main Camera/Photo View */}
