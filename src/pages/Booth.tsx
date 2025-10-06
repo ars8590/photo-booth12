@@ -217,16 +217,43 @@ const Booth = () => {
         return;
       }
 
-      // Step 1: Draw video frame (flip if mirrored)
+      // Step 1: Draw video frame using ImageCapture when available, fallback to <video>
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      if (mirrorCamera) {
-        ctx.save();
-        ctx.scale(-1, 1);
-        ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-        ctx.restore();
-      } else {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      let drewVideo = false;
+      const track = stream?.getVideoTracks?.()[0];
+      const ImageCaptureCtor = (window as any).ImageCapture;
+      if (track && ImageCaptureCtor) {
+        try {
+          const imageCapture = new ImageCaptureCtor(track);
+          const bitmap: ImageBitmap = await imageCapture.grabFrame();
+          // Resize canvas to frame size for best quality
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+
+          if (mirrorCamera) {
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.drawImage(bitmap as any, -canvas.width, 0, canvas.width, canvas.height);
+            ctx.restore();
+          } else {
+            ctx.drawImage(bitmap as any, 0, 0, canvas.width, canvas.height);
+          }
+          drewVideo = true;
+        } catch (e) {
+          console.warn('ImageCapture failed, falling back to video element', e);
+        }
+      }
+
+      if (!drewVideo) {
+        if (mirrorCamera) {
+          ctx.save();
+          ctx.scale(-1, 1);
+          ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+          ctx.restore();
+        } else {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        }
       }
 
       // Step 2: Draw template overlay on top of video if exists
@@ -282,15 +309,81 @@ const Booth = () => {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setCapturedImage(event.target?.result as string);
-        toast.success("Photo uploaded!");
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    try {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      // Set a consistent target size based on layout aspect ratio
+      const targetW = isMobile ? 1080 : 1920;
+      const targetH = isMobile ? 1920 : 1080;
+      canvas.width = targetW;
+      canvas.height = targetH;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Load uploaded photo
+      const fileUrl = URL.createObjectURL(file);
+      const photo = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Failed to load uploaded image'));
+        img.src = fileUrl;
+      });
+
+      // Draw uploaded photo to cover canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const scale = Math.max(canvas.width / photo.width, canvas.height / photo.height);
+      const dw = photo.width * scale;
+      const dh = photo.height * scale;
+      const dx = (canvas.width - dw) / 2;
+      const dy = (canvas.height - dh) / 2;
+      ctx.drawImage(photo, dx, dy, dw, dh);
+      URL.revokeObjectURL(fileUrl);
+
+      // Overlay template if available
+      if (settings?.template_image_url) {
+        const resp = await fetch(settings.template_image_url);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          const tplUrl = URL.createObjectURL(blob);
+          const overlay = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error('Failed to load template image'));
+            img.src = tplUrl;
+          });
+          ctx.drawImage(overlay, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(tplUrl);
+        }
+      } else if (settings) {
+        // Draw captions if no template image
+        const fontSize = Math.floor(canvas.height / 20);
+        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.fillStyle = '#00D9FF';
+        ctx.textAlign = 'center';
+        ctx.fillText(settings.caption, canvas.width / 2, canvas.height - fontSize * 3);
+        
+        ctx.font = `${Math.floor(fontSize * 0.7)}px Arial`;
+        ctx.fillStyle = '#9333EA';
+        ctx.fillText(settings.event_name, canvas.width / 2, canvas.height - fontSize * 1.5);
+        
+        ctx.font = `${Math.floor(fontSize * 0.5)}px Arial`;
+        ctx.fillStyle = '#00D9FF';
+        ctx.textAlign = 'left';
+        ctx.fillText(settings.watermark, 20, fontSize);
+      }
+
+      const imageData = canvas.toDataURL('image/png');
+      setCapturedImage(imageData);
+      toast.success('Photo uploaded and templated!');
+    } catch (err) {
+      console.error('Upload compose error:', err);
+      toast.error('Failed to compose uploaded photo');
     }
   };
 
