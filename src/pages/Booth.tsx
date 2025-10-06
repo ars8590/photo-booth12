@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Camera, Upload, Download, RotateCcw, FlipHorizontal, Power } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Booth = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -12,6 +13,7 @@ const Booth = () => {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [mirrorCamera, setMirrorCamera] = useState(true);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     return () => {
@@ -23,12 +25,17 @@ const Booth = () => {
 
   const startCamera = async () => {
     try {
+      // Set aspect ratio based on device type
+      const aspectRatio = isMobile ? 9 / 16 : 16 / 9;
+      const idealWidth = isMobile ? 1080 : 1920;
+      const idealHeight = isMobile ? 1920 : 1080;
+      
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: "user" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          aspectRatio: { ideal: 16 / 9 },
+          width: { ideal: idealWidth },
+          height: { ideal: idealHeight },
+          aspectRatio: { ideal: aspectRatio },
         },
         audio: false,
       });
@@ -288,7 +295,7 @@ const Booth = () => {
         </div>
 
         {/* Main Camera/Photo View */}
-        <div className="relative rounded-2xl overflow-hidden border-4 border-glow aspect-video mb-6 bg-metallic">
+        <div className="relative rounded-2xl overflow-hidden border-4 border-glow aspect-[9/16] md:aspect-video mb-6 bg-metallic">
         {!capturedImage ? (
             <>
               {/* Video Element - Always rendered */}
