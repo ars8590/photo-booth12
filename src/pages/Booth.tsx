@@ -276,32 +276,101 @@ const Booth = () => {
         </div>
 
         {/* Main Camera/Photo View */}
-        <div 
-          ref={previewContainerRef}
-          className="relative rounded-2xl overflow-hidden border-4 border-glow aspect-[9/16] md:aspect-video mb-6 bg-metallic"
-        >
+        <div className="relative rounded-2xl overflow-hidden border-4 border-glow aspect-[9/16] md:aspect-video mb-6 bg-metallic">
           {!capturedImage ? (
             <>
-              {/* Video Element - Always rendered */}
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
-                  cameraActive ? 'opacity-100 animate-fade-in' : 'opacity-0 pointer-events-none'
-                }`}
-                style={{
-                  transform: mirrorCamera ? 'scaleX(-1)' : 'scaleX(1)',
-                }}
-              />
-              <canvas ref={canvasRef} className="hidden" />
-              
+              {/* Inner capture container - only video + template overlay */}
+              <div 
+                ref={previewContainerRef}
+                className="absolute inset-0"
+              >
+                {/* Video Element - Always rendered */}
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                    cameraActive ? 'opacity-100 animate-fade-in' : 'opacity-0 pointer-events-none'
+                  }`}
+                  style={{
+                    transform: mirrorCamera ? 'scaleX(-1)' : 'scaleX(1)',
+                  }}
+                />
+                <canvas ref={canvasRef} className="hidden" />
+
+                {cameraActive && (
+                  <>
+                    {/* Holographic Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-accent/10 pointer-events-none" />
+                    
+                    {/* Active Template Overlay */}
+                    {settings ? (
+                      <>
+                        {/* Template Image Overlay - Full Coverage */}
+                        {settings.template_image_url && (
+                          <div className="absolute inset-0 pointer-events-none z-20">
+                            <img 
+                              src={settings.template_image_url} 
+                              alt="Template Overlay" 
+                              className="w-full h-full object-cover"
+                              style={{ mixBlendMode: 'normal' }}
+                            />
+                          </div>
+                        )}
+
+                        {/* Caption Overlay - Only if no template image */}
+                        {!settings.template_image_url && (
+                          <>
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-6 pointer-events-none z-20">
+                              <p className="text-center font-display text-2xl font-bold text-glow-blue">
+                                {settings.caption}
+                              </p>
+                              <p className="text-center font-display text-lg text-accent text-glow-purple">
+                                {settings.event_name}
+                              </p>
+                            </div>
+
+                            {/* Watermark */}
+                            <div className="absolute top-4 left-4 bg-background/50 backdrop-blur-sm px-3 py-1 rounded-lg border border-primary/30 pointer-events-none z-20">
+                              <p className="font-display text-xs text-primary">{settings.watermark}</p>
+                            </div>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center bg-background/80 pointer-events-none z-20">
+                        <p className="font-display text-sm text-muted-foreground">No active template set by admin</p>
+                      </div>
+                    )}
+                  </>
+                )}
+                
+                {!cameraActive && (
+                  /* Camera Off Placeholder */
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5 animate-fade-in">
+                    <div className="text-center space-y-4 px-4">
+                      <div className="relative inline-block">
+                        <Camera className="w-20 h-20 md:w-32 md:h-32 text-primary/30" />
+                        <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full animate-pulse" />
+                      </div>
+                      <p className="font-display text-lg md:text-2xl text-primary text-glow-blue">
+                        Camera Disabled
+                      </p>
+                      <p className="text-sm md:text-base text-accent text-glow-purple">
+                        Tap Power to Activate
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* UI Controls - outside capture area */}
               {/* Camera Power Toggle Button */}
               <Button
                 onClick={toggleCamera}
                 size="icon"
-                className={`absolute top-4 left-4 backdrop-blur-sm border z-10 transition-all duration-300 hover:scale-110 ${
+                className={`absolute top-4 left-4 backdrop-blur-sm border z-30 transition-all duration-300 hover:scale-110 ${
                   cameraActive 
                     ? 'bg-primary/20 border-primary shadow-[0_0_20px_rgba(0,217,255,0.6)] text-primary' 
                     : 'bg-background/50 border-muted-foreground/20 text-muted-foreground/50'
@@ -310,86 +379,23 @@ const Booth = () => {
                 <Power className={`w-5 h-5 transition-all duration-300 ${cameraActive ? 'animate-pulse' : ''}`} />
               </Button>
 
+              {/* Mirror Toggle Button */}
               {cameraActive && (
-                <>
-                  {/* Holographic Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-accent/10 pointer-events-none" />
-                  
-                  {/* Active Template Overlay */}
-                  {settings ? (
-                    <>
-                      {/* Template Image Overlay - Full Coverage */}
-                      {settings.template_image_url && (
-                        <div className="absolute inset-0 pointer-events-none z-20">
-                          <img 
-                            src={settings.template_image_url} 
-                            alt="Template Overlay" 
-                            className="w-full h-full object-cover"
-                            style={{ mixBlendMode: 'normal' }}
-                          />
-                        </div>
-                      )}
-
-                      {/* Caption Overlay - Only if no template image */}
-                      {!settings.template_image_url && (
-                        <>
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-6 pointer-events-none z-20">
-                            <p className="text-center font-display text-2xl font-bold text-glow-blue">
-                              {settings.caption}
-                            </p>
-                            <p className="text-center font-display text-lg text-accent text-glow-purple">
-                              {settings.event_name}
-                            </p>
-                          </div>
-
-                          {/* Watermark */}
-                          <div className="absolute top-4 left-4 bg-background/50 backdrop-blur-sm px-3 py-1 rounded-lg border border-primary/30 pointer-events-none z-20">
-                            <p className="font-display text-xs text-primary">{settings.watermark}</p>
-                          </div>
-                        </>
-                      )}
-                    </>
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center bg-background/80 pointer-events-none z-20">
-                      <p className="font-display text-sm text-muted-foreground">No active template set by admin</p>
-                    </div>
-                  )}
-                  
-                  {/* Mirror Toggle Button */}
-                  <Button
-                    onClick={() => setMirrorCamera(!mirrorCamera)}
-                    size="icon"
-                    variant="secondary"
-                    className="absolute top-4 right-4 box-glow-blue backdrop-blur-sm bg-background/50 border border-primary/30 z-10"
-                  >
-                    <FlipHorizontal className={`w-5 h-5 ${mirrorCamera ? 'text-primary' : 'text-muted-foreground'}`} />
-                  </Button>
-                </>
-              )}
-              
-              {!cameraActive && (
-                /* Camera Off Placeholder */
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5 animate-fade-in">
-                  <div className="text-center space-y-4 px-4">
-                    <div className="relative inline-block">
-                      <Camera className="w-20 h-20 md:w-32 md:h-32 text-primary/30" />
-                      <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full animate-pulse" />
-                    </div>
-                    <p className="font-display text-lg md:text-2xl text-primary text-glow-blue">
-                      Camera Disabled
-                    </p>
-                    <p className="text-sm md:text-base text-accent text-glow-purple">
-                      Tap Power to Activate
-                    </p>
-                  </div>
-                </div>
+                <Button
+                  onClick={() => setMirrorCamera(!mirrorCamera)}
+                  size="icon"
+                  variant="secondary"
+                  className="absolute top-4 right-4 box-glow-blue backdrop-blur-sm bg-background/50 border border-primary/30 z-30"
+                >
+                  <FlipHorizontal className={`w-5 h-5 ${mirrorCamera ? 'text-primary' : 'text-muted-foreground'}`} />
+                </Button>
               )}
               
               {/* Corner Accents */}
-              <div className="absolute top-2 left-2 w-12 h-12 sm:w-16 sm:h-16 border-l-4 border-t-4 border-primary box-glow-blue" />
-              <div className="absolute top-2 right-2 w-12 h-12 sm:w-16 sm:h-16 border-r-4 border-t-4 border-primary box-glow-blue" />
-              <div className="absolute bottom-2 left-2 w-12 h-12 sm:w-16 sm:h-16 border-l-4 border-b-4 border-accent box-glow-purple" />
-              <div className="absolute bottom-2 right-2 w-12 h-12 sm:w-16 sm:h-16 border-r-4 border-b-4 border-accent box-glow-purple" />
+              <div className="absolute top-2 left-2 w-12 h-12 sm:w-16 sm:h-16 border-l-4 border-t-4 border-primary box-glow-blue pointer-events-none" />
+              <div className="absolute top-2 right-2 w-12 h-12 sm:w-16 sm:h-16 border-r-4 border-t-4 border-primary box-glow-blue pointer-events-none" />
+              <div className="absolute bottom-2 left-2 w-12 h-12 sm:w-16 sm:h-16 border-l-4 border-b-4 border-accent box-glow-purple pointer-events-none" />
+              <div className="absolute bottom-2 right-2 w-12 h-12 sm:w-16 sm:h-16 border-r-4 border-b-4 border-accent box-glow-purple pointer-events-none" />
             </>
           ) : (
             <div className="relative w-full h-full">
