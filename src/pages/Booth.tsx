@@ -23,6 +23,7 @@ const Booth = () => {
   const [mirrorCamera, setMirrorCamera] = useState(true);
   const [settings, setSettings] = useState<BoothSettings | null>(null);
   const isMobile = useIsMobile();
+  const [templateVersion, setTemplateVersion] = useState(0);
 
   // Fetch booth settings
   useEffect(() => {
@@ -41,6 +42,7 @@ const Booth = () => {
 
       if (data) {
         setSettings(data);
+        setTemplateVersion(Date.now());
       }
     };
 
@@ -58,6 +60,7 @@ const Booth = () => {
         },
         (payload) => {
           setSettings(payload.new as BoothSettings);
+          setTemplateVersion(Date.now());
           toast.info('Template updated!');
         }
       )
@@ -83,15 +86,32 @@ const Booth = () => {
       const idealWidth = isMobile ? 1080 : 1920;
       const idealHeight = isMobile ? 1920 : 1080;
       
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "user" },
-          width: { ideal: idealWidth },
-          height: { ideal: idealHeight },
-          aspectRatio: { ideal: aspectRatio },
+      let mediaStream: MediaStream | null = null;
+      let lastError: any = null;
+      
+      const constraintsList: MediaStreamConstraints[] = [
+        {
+          video: {
+            facingMode: { ideal: 'user' },
+            width: { ideal: idealWidth },
+            height: { ideal: idealHeight },
+          },
+          audio: false,
         },
-        audio: false,
-      });
+        { video: { facingMode: 'user' }, audio: false } as any,
+        { video: true, audio: false },
+      ];
+
+      for (const c of constraintsList) {
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia(c);
+          break;
+        } catch (e) {
+          lastError = e;
+          continue;
+        }
+      }
+      if (!mediaStream) throw lastError!;
 
       const video = videoRef.current;
       if (video) {
@@ -353,16 +373,17 @@ const Booth = () => {
                     {settings ? (
                       <>
                         {/* Template Image Overlay - Full Coverage */}
-                        {settings.template_image_url && (
-                          <div className="absolute inset-0 pointer-events-none z-20">
-                            <img 
-                              src={settings.template_image_url} 
-                              alt="Template Overlay" 
-                              className="w-full h-full object-cover"
-                              style={{ mixBlendMode: 'normal' }}
-                            />
-                          </div>
-                        )}
+                          {settings.template_image_url && (
+                            <div className="absolute inset-0 pointer-events-none z-20">
+                              <img 
+                                key={templateVersion}
+                                src={`${settings.template_image_url}?v=${templateVersion}`}
+                                alt="Template Overlay" 
+                                className="w-full h-full object-cover"
+                                style={{ mixBlendMode: 'normal' }}
+                              />
+                            </div>
+                          )}
 
                         {/* Caption Overlay - Only if no template image */}
                         {!settings.template_image_url && (
