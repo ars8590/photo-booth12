@@ -528,7 +528,7 @@ const Booth = () => {
                 <p className="text-center font-display text-2xl font-bold text-glow-blue">
                   CAUGHT IN VIBE
                 </p>
-                <p className="text-center font-display text-lg text-accent text-glow-purple">
+                <p className="text-center font-display text-lg text-primary text-glow-blue">
                   VIBRANIUM 5.0
                 </p>
               </div>
