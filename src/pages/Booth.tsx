@@ -265,58 +265,68 @@ const Booth = () => {
         </div>
 
         {/* Main Camera/Photo View */}
-        <div ref={containerRef} className="relative rounded-2xl overflow-hidden border-4 border-glow aspect-[9/16] md:aspect-video mb-6 bg-metallic">
+        <div ref={containerRef} className="relative rounded-2xl overflow-hidden border-4 border-glow aspect-[9/16] md:aspect-video mb-6">
         {!capturedImage ? (
             <>
-              {/* Video Element - Always rendered */}
+              {/* Video Element - Bottom Layer (z-index: 1) */}
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted
-                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                className={`absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-500 ${
                   cameraActive ? 'opacity-100 animate-fade-in' : 'opacity-0 pointer-events-none'
                 }`}
                 style={{
                   transform: mirrorCamera ? 'scaleX(-1)' : 'scaleX(1)',
+                  zIndex: 1,
                 }}
               />
               
-              {/* Template Overlay */}
+              {/* Template Overlay - Top Layer (z-index: 2) */}
               {cameraActive && activeTemplateUrl && (
                 <img
                   src={activeTemplateUrl}
                   alt="Template overlay"
-                  className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                  className="absolute top-0 left-0 w-full h-full object-cover pointer-events-none"
+                  style={{
+                    zIndex: 2,
+                    background: 'transparent',
+                  }}
                 />
               )}
               
               <canvas ref={canvasRef} className="hidden" />
               
-              {/* Camera Power Toggle Button */}
+              {/* Camera Power Toggle Button - z-index: 10 */}
               <Button
                 onClick={toggleCamera}
                 size="icon"
-                className={`absolute top-4 left-4 backdrop-blur-sm border z-10 transition-all duration-300 hover:scale-110 ${
+                className={`absolute top-4 left-4 backdrop-blur-sm border transition-all duration-300 hover:scale-110 ${
                   cameraActive 
                     ? 'bg-primary/20 border-primary shadow-[0_0_20px_rgba(0,217,255,0.6)] text-primary' 
                     : 'bg-background/50 border-muted-foreground/20 text-muted-foreground/50'
                 }`}
+                style={{ zIndex: 10 }}
               >
                 <Power className={`w-5 h-5 transition-all duration-300 ${cameraActive ? 'animate-pulse' : ''}`} />
               </Button>
 
               {cameraActive && (
                 <>
-                  {/* Holographic Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-accent/10 pointer-events-none" />
+                  {/* Holographic Overlay - z-index: 3 */}
+                  <div 
+                    className="absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-accent/10 pointer-events-none"
+                    style={{ zIndex: 3 }}
+                  />
                   
-                  {/* Mirror Toggle Button */}
+                  {/* Mirror Toggle Button - z-index: 10 */}
                   <Button
                     onClick={() => setMirrorCamera(!mirrorCamera)}
                     size="icon"
                     variant="secondary"
-                    className="absolute top-4 right-4 box-glow-blue backdrop-blur-sm bg-background/50 border border-primary/30 z-10"
+                    className="absolute top-4 right-4 box-glow-blue backdrop-blur-sm bg-background/50 border border-primary/30"
+                    style={{ zIndex: 10 }}
                   >
                     <FlipHorizontal className={`w-5 h-5 ${mirrorCamera ? 'text-primary' : 'text-muted-foreground'}`} />
                   </Button>
@@ -324,8 +334,11 @@ const Booth = () => {
               )}
               
               {!cameraActive && (
-                /* Camera Off Placeholder */
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5 animate-fade-in">
+                /* Camera Off Placeholder - z-index: 5 */
+                <div 
+                  className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5 animate-fade-in"
+                  style={{ zIndex: 5 }}
+                >
                   <div className="text-center space-y-4 px-4">
                     <div className="relative inline-block">
                       <Camera className="w-20 h-20 md:w-32 md:h-32 text-primary/30" />
@@ -341,11 +354,11 @@ const Booth = () => {
                 </div>
               )}
               
-              {/* Corner Accents */}
-              <div className="absolute top-2 left-2 w-12 h-12 sm:w-16 sm:h-16 border-l-4 border-t-4 border-primary box-glow-blue" />
-              <div className="absolute top-2 right-2 w-12 h-12 sm:w-16 sm:h-16 border-r-4 border-t-4 border-primary box-glow-blue" />
-              <div className="absolute bottom-2 left-2 w-12 h-12 sm:w-16 sm:h-16 border-l-4 border-b-4 border-accent box-glow-purple" />
-              <div className="absolute bottom-2 right-2 w-12 h-12 sm:w-16 sm:h-16 border-r-4 border-b-4 border-accent box-glow-purple" />
+              {/* Corner Accents - z-index: 4 */}
+              <div className="absolute top-2 left-2 w-12 h-12 sm:w-16 sm:h-16 border-l-4 border-t-4 border-primary box-glow-blue" style={{ zIndex: 4 }} />
+              <div className="absolute top-2 right-2 w-12 h-12 sm:w-16 sm:h-16 border-r-4 border-t-4 border-primary box-glow-blue" style={{ zIndex: 4 }} />
+              <div className="absolute bottom-2 left-2 w-12 h-12 sm:w-16 sm:h-16 border-l-4 border-b-4 border-accent box-glow-purple" style={{ zIndex: 4 }} />
+              <div className="absolute bottom-2 right-2 w-12 h-12 sm:w-16 sm:h-16 border-r-4 border-b-4 border-accent box-glow-purple" style={{ zIndex: 4 }} />
             </>
           ) : (
             <div className="relative w-full h-full">
