@@ -526,7 +526,7 @@ const Booth = () => {
               {/* Caption Overlay */}
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-6">
                 <p className="text-center font-display text-2xl font-bold text-glow-blue">
-                  I HAVE PARTICIPATED
+                  CAUGHT IN VIBE
                 </p>
                 <p className="text-center font-display text-lg text-accent text-glow-purple">
                   VIBRANIUM 5.0
