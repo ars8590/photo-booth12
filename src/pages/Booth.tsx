@@ -192,14 +192,67 @@ const Booth = () => {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setCapturedImage(event.target?.result as string);
-        toast.success("Photo uploaded!");
+    if (!file) return;
+
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = async (event) => {
+      const src = event.target?.result as string;
+      img.onload = async () => {
+        const canvas = canvasRef.current || document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Determine target size based on live video if available
+        const video = videoRef.current;
+        const targetW = video?.videoWidth || img.naturalWidth;
+        const targetH = video?.videoHeight || img.naturalHeight;
+        canvas.width = targetW;
+        canvas.height = targetH;
+
+        // Draw uploaded image with object-fit: cover behavior
+        const imgAspect = img.naturalWidth / img.naturalHeight;
+        const canvasAspect = targetW / targetH;
+        let drawW = targetW;
+        let drawH = targetH;
+        let dx = 0;
+        let dy = 0;
+        if (imgAspect > canvasAspect) {
+          // Image is wider than canvas
+          drawH = targetH;
+          drawW = imgAspect * drawH;
+          dx = (targetW - drawW) / 2;
+        } else {
+          // Image is taller than canvas
+          drawW = targetW;
+          drawH = drawW / imgAspect;
+          dy = (targetH - drawH) / 2;
+        }
+        ctx.drawImage(img, dx, dy, drawW, drawH);
+
+        // Overlay active template if present
+        if (activeTemplateUrl) {
+          await new Promise<void>((resolve, reject) => {
+            const overlay = new Image();
+            overlay.crossOrigin = 'anonymous';
+            overlay.onload = () => {
+              ctx.drawImage(overlay, 0, 0, targetW, targetH);
+              resolve();
+            };
+            overlay.onerror = reject;
+            overlay.src = activeTemplateUrl;
+          });
+        }
+
+        const merged = canvas.toDataURL('image/png');
+        setCapturedImage(merged);
+        toast.success('Photo uploaded!');
       };
-      reader.readAsDataURL(file);
-    }
+      img.src = src;
+    };
+
+    reader.readAsDataURL(file);
   };
 
   const downloadPhoto = async () => {
