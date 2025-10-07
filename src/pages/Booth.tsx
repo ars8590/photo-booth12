@@ -6,12 +6,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
 
-type FilterType = 'normal' | 'blackwhite' | 'anime-ai';
+type FilterType = 'normal' | 'blackwhite' | 'anime-ai' | 'age-reduce-ai';
 
 const FILTERS: { id: FilterType; name: string; icon: string; css: string; isAI?: boolean }[] = [
   { id: 'normal', name: 'Normal', icon: '🎞', css: 'none' },
   { id: 'blackwhite', name: 'Black & White', icon: '⚫', css: 'grayscale(1) contrast(1.2)' },
   { id: 'anime-ai', name: 'AI Anime Artstyle', icon: '🎨', css: 'none', isAI: true },
+  { id: 'age-reduce-ai', name: 'Age-Reducing', icon: '🕓', css: 'none', isAI: true },
 ];
 
 const Booth = () => {
@@ -191,41 +192,51 @@ const Booth = () => {
         
         let finalImageData = canvas.toDataURL("image/png");
 
-        // If AI Anime filter is selected, transform the image
+        // If AI filter is selected, transform the image
         if (activeFilter?.isAI) {
           setIsProcessingAI(true);
-          toast.info("✨ Generating Anime Style... Please wait...");
+          
+          const isAnimeFilter = selectedFilter === 'anime-ai';
+          const isAgeReduceFilter = selectedFilter === 'age-reduce-ai';
+          
+          if (isAnimeFilter) {
+            toast.info("✨ Generating Anime Style... Please wait...");
+          } else if (isAgeReduceFilter) {
+            toast.info("🕓 Rewinding time... Creating your younger self...");
+          }
           
           try {
-            const { data, error } = await supabase.functions.invoke('anime-style-transform', {
+            const functionName = isAnimeFilter ? 'anime-style-transform' : 'age-reducing-transform';
+            const { data, error } = await supabase.functions.invoke(functionName, {
               body: { imageData: finalImageData }
             });
 
             if (error) throw error;
             
-            if (!data?.animeImage) {
-              throw new Error('No anime image returned');
+            const transformedImageKey = isAnimeFilter ? 'animeImage' : 'transformedImage';
+            if (!data?.[transformedImageKey]) {
+              throw new Error('No transformed image returned');
             }
 
-            // Create a new canvas for the anime-styled image
-            const animeCanvas = document.createElement('canvas');
-            animeCanvas.width = canvas.width;
-            animeCanvas.height = canvas.height;
-            const animeCtx = animeCanvas.getContext('2d');
+            // Create a new canvas for the transformed image
+            const transformedCanvas = document.createElement('canvas');
+            transformedCanvas.width = canvas.width;
+            transformedCanvas.height = canvas.height;
+            const transformedCtx = transformedCanvas.getContext('2d');
             
-            if (!animeCtx) {
-              throw new Error('Failed to create anime canvas context');
+            if (!transformedCtx) {
+              throw new Error('Failed to create canvas context');
             }
 
-            // Load and draw the anime-styled image
-            const animeImg = new Image();
+            // Load and draw the transformed image
+            const transformedImg = new Image();
             await new Promise((resolve, reject) => {
-              animeImg.onload = resolve;
-              animeImg.onerror = reject;
-              animeImg.src = data.animeImage;
+              transformedImg.onload = resolve;
+              transformedImg.onerror = reject;
+              transformedImg.src = data[transformedImageKey];
             });
 
-            animeCtx.drawImage(animeImg, 0, 0, animeCanvas.width, animeCanvas.height);
+            transformedCtx.drawImage(transformedImg, 0, 0, transformedCanvas.width, transformedCanvas.height);
             
             // Overlay template if exists
             if (activeTemplateUrl) {
@@ -238,14 +249,20 @@ const Booth = () => {
                 templateImg.src = activeTemplateUrl;
               });
               
-              animeCtx.drawImage(templateImg, 0, 0, animeCanvas.width, animeCanvas.height);
+              transformedCtx.drawImage(templateImg, 0, 0, transformedCanvas.width, transformedCanvas.height);
             }
 
-            finalImageData = animeCanvas.toDataURL('image/png');
-            toast.success("💠 Your Anime Self is Ready!");
+            finalImageData = transformedCanvas.toDataURL('image/png');
+            
+            if (isAnimeFilter) {
+              toast.success("💠 Your Anime Self is Ready!");
+            } else if (isAgeReduceFilter) {
+              toast.success("💫 You've traveled back in time!");
+            }
           } catch (error) {
             console.error('Error processing AI filter:', error);
-            toast.error("Failed to apply anime style. Using original photo.");
+            const filterType = isAnimeFilter ? 'anime style' : 'age reduction';
+            toast.error(`Failed to apply ${filterType}. Using original photo.`);
             // Continue with non-AI processed image
           } finally {
             setIsProcessingAI(false);
