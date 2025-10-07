@@ -1,10 +1,20 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera, Upload, Download, RotateCcw, FlipHorizontal, Power } from "lucide-react";
+import { Camera, Upload, Download, RotateCcw, FlipHorizontal, Power, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
+
+type FilterType = 'normal' | 'blackwhite' | 'vibrant' | 'hologram' | 'anime';
+
+const FILTERS: { id: FilterType; name: string; icon: string; css: string }[] = [
+  { id: 'normal', name: 'Normal', icon: '🎞', css: 'none' },
+  { id: 'blackwhite', name: 'B&W', icon: '⚫', css: 'grayscale(1) contrast(1.2)' },
+  { id: 'vibrant', name: 'Neon Glow', icon: '🌈', css: 'saturate(2) contrast(1.3) brightness(1.1) hue-rotate(15deg)' },
+  { id: 'hologram', name: 'Hologram', icon: '🧬', css: 'hue-rotate(180deg) saturate(1.5) contrast(1.2) brightness(1.1)' },
+  { id: 'anime', name: 'Anime', icon: '🎨', css: 'saturate(1.8) contrast(1.4) brightness(1.05) sepia(0.1)' },
+];
 
 const Booth = () => {
   const navigate = useNavigate();
@@ -16,6 +26,8 @@ const Booth = () => {
   const [cameraActive, setCameraActive] = useState(false);
   const [mirrorCamera, setMirrorCamera] = useState(true);
   const [activeTemplateUrl, setActiveTemplateUrl] = useState<string | null>(null);
+  const [selectedFilter, setSelectedFilter] = useState<FilterType>('normal');
+  const [showFilters, setShowFilters] = useState(false);
   const isMobile = useIsMobile();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -163,8 +175,17 @@ const Booth = () => {
           ctx.scale(-1, 1);
         }
         
+        // Apply filter to canvas context
+        const activeFilter = FILTERS.find(f => f.id === selectedFilter);
+        if (activeFilter && activeFilter.css !== 'none') {
+          ctx.filter = activeFilter.css;
+        }
+        
         // Draw camera feed
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Reset filter
+        ctx.filter = 'none';
         
         // Restore context state
         ctx.restore();
@@ -327,11 +348,12 @@ const Booth = () => {
                 autoPlay
                 playsInline
                 muted
-                className={`absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-500 ${
+                className={`absolute top-0 left-0 w-full h-full object-cover transition-all duration-500 ${
                   cameraActive ? 'opacity-100 animate-fade-in' : 'opacity-0 pointer-events-none'
                 }`}
                 style={{
                   transform: mirrorCamera ? 'scaleX(-1)' : 'scaleX(1)',
+                  filter: FILTERS.find(f => f.id === selectedFilter)?.css || 'none',
                   zIndex: 1,
                 }}
               />
@@ -437,6 +459,45 @@ const Booth = () => {
             </div>
           )}
         </div>
+
+        {/* Filter Selector */}
+        {!capturedImage && cameraActive && (
+          <div className="mb-4 animate-fade-in">
+            <Button
+              onClick={() => setShowFilters(!showFilters)}
+              variant="outline"
+              size="lg"
+              className="w-full box-glow-purple font-display text-base md:text-lg px-6 md:px-8 min-h-[48px] border-2 border-accent/50 bg-background/80 backdrop-blur-sm"
+            >
+              <Sparkles className="w-4 h-4 md:w-5 md:h-5 mr-2" />
+              Filters {FILTERS.find(f => f.id === selectedFilter)?.icon}
+            </Button>
+            
+            {showFilters && (
+              <div className="flex gap-2 mt-3 overflow-x-auto pb-2 animate-scale-in">
+                {FILTERS.map((filter) => (
+                  <Button
+                    key={filter.id}
+                    onClick={() => {
+                      setSelectedFilter(filter.id);
+                      toast.success(`${filter.name} filter applied!`);
+                    }}
+                    variant={selectedFilter === filter.id ? "default" : "outline"}
+                    size="lg"
+                    className={`flex-shrink-0 font-display min-w-[120px] transition-all duration-300 ${
+                      selectedFilter === filter.id 
+                        ? 'box-glow-blue border-2 border-primary scale-105 shadow-[0_0_25px_rgba(0,217,255,0.7)]' 
+                        : 'border-2 border-muted-foreground/30 hover:border-accent hover:scale-105'
+                    }`}
+                  >
+                    <span className="text-2xl mr-2">{filter.icon}</span>
+                    {filter.name}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Control Buttons */}
         <div className="flex flex-col sm:flex-row flex-wrap gap-3 md:gap-4 justify-center">
