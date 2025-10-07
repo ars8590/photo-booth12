@@ -6,14 +6,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
 
-type FilterType = 'normal' | 'blackwhite' | 'vibrant' | 'hologram' | 'anime';
+type FilterType = 'normal' | 'blackwhite' | 'anime-ai';
 
-const FILTERS: { id: FilterType; name: string; icon: string; css: string }[] = [
+const FILTERS: { id: FilterType; name: string; icon: string; css: string; isAI?: boolean }[] = [
   { id: 'normal', name: 'Normal', icon: '🎞', css: 'none' },
-  { id: 'blackwhite', name: 'B&W', icon: '⚫', css: 'grayscale(1) contrast(1.2)' },
-  { id: 'vibrant', name: 'Neon Glow', icon: '🌈', css: 'saturate(2) contrast(1.3) brightness(1.1) hue-rotate(15deg)' },
-  { id: 'hologram', name: 'Hologram', icon: '🧬', css: 'hue-rotate(180deg) saturate(1.5) contrast(1.2) brightness(1.1)' },
-  { id: 'anime', name: 'Anime', icon: '🎨', css: 'saturate(1.8) contrast(1.4) brightness(1.05) sepia(0.1)' },
+  { id: 'blackwhite', name: 'Black & White', icon: '⚫', css: 'grayscale(1) contrast(1.2)' },
+  { id: 'anime-ai', name: 'AI Anime Artstyle', icon: '🎨', css: 'none', isAI: true },
 ];
 
 const Booth = () => {
@@ -28,6 +26,7 @@ const Booth = () => {
   const [activeTemplateUrl, setActiveTemplateUrl] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('normal');
   const [showFilters, setShowFilters] = useState(false);
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
   const isMobile = useIsMobile();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -175,9 +174,9 @@ const Booth = () => {
           ctx.scale(-1, 1);
         }
         
-        // Apply filter to canvas context
+        // Apply CSS filter to canvas context (for non-AI filters)
         const activeFilter = FILTERS.find(f => f.id === selectedFilter);
-        if (activeFilter && activeFilter.css !== 'none') {
+        if (activeFilter && activeFilter.css !== 'none' && !activeFilter.isAI) {
           ctx.filter = activeFilter.css;
         }
         
@@ -190,23 +189,88 @@ const Booth = () => {
         // Restore context state
         ctx.restore();
         
-        // If there's an active template, overlay it
-        if (activeTemplateUrl) {
-          await new Promise<void>((resolve, reject) => {
-            const templateImg = new Image();
-            templateImg.crossOrigin = "anonymous";
-            templateImg.onload = () => {
-              ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
-              resolve();
-            };
-            templateImg.onerror = reject;
-            templateImg.src = activeTemplateUrl;
-          });
+        let finalImageData = canvas.toDataURL("image/png");
+
+        // If AI Anime filter is selected, transform the image
+        if (activeFilter?.isAI) {
+          setIsProcessingAI(true);
+          toast.info("✨ Generating Anime Style... Please wait...");
+          
+          try {
+            const { data, error } = await supabase.functions.invoke('anime-style-transform', {
+              body: { imageData: finalImageData }
+            });
+
+            if (error) throw error;
+            
+            if (!data?.animeImage) {
+              throw new Error('No anime image returned');
+            }
+
+            // Create a new canvas for the anime-styled image
+            const animeCanvas = document.createElement('canvas');
+            animeCanvas.width = canvas.width;
+            animeCanvas.height = canvas.height;
+            const animeCtx = animeCanvas.getContext('2d');
+            
+            if (!animeCtx) {
+              throw new Error('Failed to create anime canvas context');
+            }
+
+            // Load and draw the anime-styled image
+            const animeImg = new Image();
+            await new Promise((resolve, reject) => {
+              animeImg.onload = resolve;
+              animeImg.onerror = reject;
+              animeImg.src = data.animeImage;
+            });
+
+            animeCtx.drawImage(animeImg, 0, 0, animeCanvas.width, animeCanvas.height);
+            
+            // Overlay template if exists
+            if (activeTemplateUrl) {
+              const templateImg = new Image();
+              templateImg.crossOrigin = "anonymous";
+              
+              await new Promise((resolve, reject) => {
+                templateImg.onload = resolve;
+                templateImg.onerror = reject;
+                templateImg.src = activeTemplateUrl;
+              });
+              
+              animeCtx.drawImage(templateImg, 0, 0, animeCanvas.width, animeCanvas.height);
+            }
+
+            finalImageData = animeCanvas.toDataURL('image/png');
+            toast.success("💠 Your Anime Self is Ready!");
+          } catch (error) {
+            console.error('Error processing AI filter:', error);
+            toast.error("Failed to apply anime style. Using original photo.");
+            // Continue with non-AI processed image
+          } finally {
+            setIsProcessingAI(false);
+          }
+        } else {
+          // For non-AI filters, just apply template overlay
+          if (activeTemplateUrl) {
+            await new Promise<void>((resolve, reject) => {
+              const templateImg = new Image();
+              templateImg.crossOrigin = "anonymous";
+              templateImg.onload = () => {
+                ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
+                resolve();
+              };
+              templateImg.onerror = reject;
+              templateImg.src = activeTemplateUrl;
+            });
+            finalImageData = canvas.toDataURL("image/png");
+          }
         }
-        
-        const imageData = canvas.toDataURL("image/png");
-        setCapturedImage(imageData);
-        toast.success("Photo captured!");
+
+        setCapturedImage(finalImageData);
+        if (!activeFilter?.isAI) {
+          toast.success("Photo captured!");
+        }
       }
     }
   };
@@ -467,6 +531,7 @@ const Booth = () => {
               onClick={() => setShowFilters(!showFilters)}
               variant="outline"
               size="lg"
+              disabled={isProcessingAI}
               className="w-full box-glow-purple font-display text-base md:text-lg px-6 md:px-8 min-h-[48px] border-2 border-accent/50 bg-background/80 backdrop-blur-sm"
             >
               <Sparkles className="w-4 h-4 md:w-5 md:h-5 mr-2" />
@@ -480,18 +545,23 @@ const Booth = () => {
                     key={filter.id}
                     onClick={() => {
                       setSelectedFilter(filter.id);
-                      toast.success(`${filter.name} filter applied!`);
+                      toast.success(
+                        filter.isAI 
+                          ? `${filter.name} will be applied after capture!` 
+                          : `${filter.name} filter applied!`
+                      );
                     }}
                     variant={selectedFilter === filter.id ? "default" : "outline"}
                     size="lg"
-                    className={`flex-shrink-0 font-display min-w-[120px] transition-all duration-300 ${
+                    disabled={isProcessingAI}
+                    className={`flex-shrink-0 font-display min-w-[140px] transition-all duration-300 ${
                       selectedFilter === filter.id 
                         ? 'box-glow-blue border-2 border-primary scale-105 shadow-[0_0_25px_rgba(0,217,255,0.7)]' 
                         : 'border-2 border-muted-foreground/30 hover:border-accent hover:scale-105'
                     }`}
                   >
                     <span className="text-2xl mr-2">{filter.icon}</span>
-                    {filter.name}
+                    <span className="text-sm">{filter.name}</span>
                   </Button>
                 ))}
               </div>
@@ -505,12 +575,12 @@ const Booth = () => {
             <>
               <Button
                 onClick={capturePhoto}
-                disabled={!cameraActive}
+                disabled={!cameraActive || isProcessingAI}
                 size="lg"
                 className="box-glow-blue font-display text-base md:text-lg px-6 md:px-8 min-h-[48px] w-full sm:w-auto"
               >
                 <Camera className="w-4 h-4 md:w-5 md:h-5 mr-2" />
-                Capture Photo
+                {isProcessingAI ? "Processing..." : "Capture Photo"}
               </Button>
               <Button
                 onClick={() => fileInputRef.current?.click()}

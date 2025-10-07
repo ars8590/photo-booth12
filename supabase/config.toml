@@ -1,1 +1,4 @@
 project_id = "brlfizqmdiwrhqdcrbij"
+
+[functions.anime-style-transform]
+verify_jwt = false
