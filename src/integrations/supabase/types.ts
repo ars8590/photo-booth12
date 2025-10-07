@@ -19,6 +19,10 @@ export type Database = {
           caption: string | null
           event_name: string | null
           id: string
+          slideshow_animation: string | null
+          slideshow_caption_enabled: boolean | null
+          slideshow_duration: number | null
+          slideshow_enabled: boolean | null
           template_image_url: string | null
           updated_at: string | null
           watermark: string | null
@@ -27,6 +31,10 @@ export type Database = {
           caption?: string | null
           event_name?: string | null
           id?: string
+          slideshow_animation?: string | null
+          slideshow_caption_enabled?: boolean | null
+          slideshow_duration?: number | null
+          slideshow_enabled?: boolean | null
           template_image_url?: string | null
           updated_at?: string | null
           watermark?: string | null
@@ -35,6 +43,10 @@ export type Database = {
           caption?: string | null
           event_name?: string | null
           id?: string
+          slideshow_animation?: string | null
+          slideshow_caption_enabled?: boolean | null
+          slideshow_duration?: number | null
+          slideshow_enabled?: boolean | null
           template_image_url?: string | null
           updated_at?: string | null
           watermark?: string | null

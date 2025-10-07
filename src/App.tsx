@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Booth from "./pages/Booth";
 import Feed from "./pages/Feed";
+import Slideshow from "./pages/Slideshow";
 import Admin from "./pages/Admin";
 import Navigation from "./components/Navigation";
 import Footer from "./components/Footer";
@@ -22,6 +23,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Booth />} />
           <Route path="/feed" element={<Feed />} />
+          <Route path="/slideshow" element={<Slideshow />} />
           <Route path="/admin" element={<Admin />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

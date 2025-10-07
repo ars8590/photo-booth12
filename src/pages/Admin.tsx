@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Camera, Download, Image, Settings, BarChart3, Trash2, RefreshCw, ArrowDownToLine, Lock, ShieldAlert, Upload, CheckCircle2 } from "lucide-react";
+import { Camera, Download, Image, Settings, Trash2, RefreshCw, ArrowDownToLine, Lock, ShieldAlert, Upload, CheckCircle2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,10 @@ type BoothSettings = {
   caption: string | null;
   watermark: string | null;
   updated_at: string | null;
+  slideshow_duration: number | null;
+  slideshow_animation: string | null;
+  slideshow_enabled: boolean | null;
+  slideshow_caption_enabled: boolean | null;
 };
 
 type Template = {
@@ -45,6 +49,10 @@ const Admin = () => {
   const [eventName, setEventName] = useState("");
   const [caption, setCaption] = useState("");
   const [watermark, setWatermark] = useState("");
+  const [slideshowDuration, setSlideshowDuration] = useState(5);
+  const [slideshowAnimation, setSlideshowAnimation] = useState("fade");
+  const [slideshowEnabled, setSlideshowEnabled] = useState(true);
+  const [slideshowCaptionEnabled, setSlideshowCaptionEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -134,6 +142,10 @@ const Admin = () => {
         setEventName(data.event_name || "");
         setCaption(data.caption || "");
         setWatermark(data.watermark || "");
+        setSlideshowDuration(data.slideshow_duration || 5);
+        setSlideshowAnimation(data.slideshow_animation || "fade");
+        setSlideshowEnabled(data.slideshow_enabled ?? true);
+        setSlideshowCaptionEnabled(data.slideshow_caption_enabled ?? true);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -334,6 +346,10 @@ const Admin = () => {
           event_name: eventName,
           caption: caption,
           watermark: watermark,
+          slideshow_duration: slideshowDuration,
+          slideshow_animation: slideshowAnimation,
+          slideshow_enabled: slideshowEnabled,
+          slideshow_caption_enabled: slideshowCaptionEnabled,
           updated_at: new Date().toISOString()
         })
         .eq('id', settings.id);
@@ -464,10 +480,11 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="photos" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6 bg-card border border-primary/30">
+          <TabsList className="grid w-full grid-cols-4 mb-6 bg-card border border-primary/30">
             <TabsTrigger value="photos">Photos</TabsTrigger>
             <TabsTrigger value="templates">Templates</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsTrigger value="display">Display</TabsTrigger>
           </TabsList>
 
           <TabsContent value="photos">
@@ -663,6 +680,67 @@ const Admin = () => {
                 <Button onClick={saveSettings} className="box-glow-blue w-full sm:w-auto min-h-[48px]">
                   <Settings className="w-4 h-4 mr-2" />
                   Save Settings
+                </Button>
+              </div>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="display">
+            <Card className="p-4 md:p-6 bg-card border-primary/30">
+              <h2 className="font-display text-xl md:text-2xl font-bold text-primary mb-4 md:mb-6">Display Settings</h2>
+              <div className="space-y-4 md:space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="slideshow-duration">Transition Duration (seconds)</Label>
+                  <Input
+                    id="slideshow-duration"
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={slideshowDuration}
+                    onChange={(e) => setSlideshowDuration(Number(e.target.value))}
+                    className="min-h-[48px]"
+                  />
+                  <p className="text-xs text-muted-foreground">How long each photo displays before transitioning</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="slideshow-animation">Animation Type</Label>
+                  <select
+                    id="slideshow-animation"
+                    value={slideshowAnimation}
+                    onChange={(e) => setSlideshowAnimation(e.target.value)}
+                    className="w-full min-h-[48px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <option value="fade">Fade</option>
+                    <option value="slide">Slide</option>
+                    <option value="zoom">Zoom</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-between p-4 border border-primary/20 rounded-lg">
+                  <div className="space-y-0.5">
+                    <Label>Show Caption Overlay</Label>
+                    <p className="text-xs text-muted-foreground">Display event name and caption on slideshow</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={slideshowCaptionEnabled}
+                    onChange={(e) => setSlideshowCaptionEnabled(e.target.checked)}
+                    className="w-10 h-10 rounded border-primary/30 text-primary focus:ring-primary"
+                  />
+                </div>
+
+                <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg space-y-2">
+                  <p className="font-display text-sm text-primary">📺 Display Mode URL</p>
+                  <p className="text-xs text-muted-foreground">Open this link on projectors or LED screens:</p>
+                  <code className="block bg-card p-2 rounded text-xs break-all border border-primary/30">
+                    {window.location.origin}/slideshow
+                  </code>
+                </div>
+
+                <Button onClick={saveSettings} className="box-glow-blue w-full sm:w-auto min-h-[48px]">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Save Display Settings
                 </Button>
               </div>
             </Card>
