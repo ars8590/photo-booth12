@@ -4,8 +4,10 @@ import { Camera, Upload, Download, RotateCcw, FlipHorizontal, Power } from "luci
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useNavigate } from "react-router-dom";
 
 const Booth = () => {
+  const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -445,6 +447,13 @@ const Booth = () => {
           )}
         </div>
       </div>
+
+      {/* Hidden Admin Trigger - Bottom Right Corner */}
+      <button
+        onClick={() => navigate('/admin')}
+        className="fixed bottom-4 right-4 w-12 h-12 opacity-0 hover:opacity-100 transition-opacity duration-300 bg-primary/5 hover:bg-primary/20 rounded-full border border-primary/20 hover:border-primary/50 backdrop-blur-sm"
+        aria-label="Admin Access"
+      />
     </div>
   );
 };

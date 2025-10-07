@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Camera, Download, Image, Settings, BarChart3, Trash2, RefreshCw, ArrowDownToLine } from "lucide-react";
+import { Camera, Download, Image, Settings, BarChart3, Trash2, RefreshCw, ArrowDownToLine, Lock, ShieldAlert } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+const ACCESS_CODE = "VIBRANIUM2025";
+const SESSION_KEY = "vibranium_admin_access";
 
 type Photo = {
   id: string;
@@ -33,6 +36,9 @@ type Template = {
 };
 
 const Admin = () => {
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [accessCode, setAccessCode] = useState("");
+  const [showError, setShowError] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [settings, setSettings] = useState<BoothSettings | null>(null);
   const [eventName, setEventName] = useState("");
@@ -47,9 +53,33 @@ const Admin = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    loadData();
-    setupRealtimeSubscription();
+    // Check if user has valid session
+    const hasAccess = sessionStorage.getItem(SESSION_KEY);
+    if (hasAccess === ACCESS_CODE) {
+      setIsUnlocked(true);
+    }
   }, []);
+
+  useEffect(() => {
+    if (isUnlocked) {
+      loadData();
+      setupRealtimeSubscription();
+    }
+  }, [isUnlocked]);
+
+  const handleAccessSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (accessCode === ACCESS_CODE) {
+      sessionStorage.setItem(SESSION_KEY, ACCESS_CODE);
+      setIsUnlocked(true);
+      setShowError(false);
+      toast.success("Access granted! Welcome to the Admin Panel.");
+    } else {
+      setShowError(true);
+      setAccessCode("");
+      setTimeout(() => setShowError(false), 3000);
+    }
+  };
 
   const setupRealtimeSubscription = () => {
     const channel = supabase
@@ -256,6 +286,77 @@ const Admin = () => {
     { label: "Storage Used", value: `${(photos.length * 0.5).toFixed(1)} MB`, icon: Image, color: "text-accent" },
     { label: "Photos Downloaded", value: "0", icon: ArrowDownToLine, color: "text-primary" },
   ];
+
+  // Access Gate - Show before admin panel
+  if (!isUnlocked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-background via-primary/5 to-accent/5">
+        <div className="w-full max-w-md">
+          <Card className="p-8 bg-card/80 backdrop-blur-sm border-2 border-primary/30 box-glow-blue">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-4 relative">
+                <Lock className="w-10 h-10 text-primary animate-pulse" />
+                <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full animate-pulse" />
+              </div>
+              <h1 className="font-display text-2xl md:text-3xl font-bold text-glow-blue mb-2">
+                RESTRICTED ACCESS
+              </h1>
+              <p className="text-muted-foreground text-sm">
+                Vibranium 5.0 Admin Portal
+              </p>
+            </div>
+
+            <form onSubmit={handleAccessSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="access-code" className="text-foreground">
+                  Enter Access Code
+                </Label>
+                <Input
+                  id="access-code"
+                  type="password"
+                  value={accessCode}
+                  onChange={(e) => setAccessCode(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="bg-input border-primary/30 text-foreground placeholder:text-muted-foreground min-h-[48px] font-mono text-center text-lg tracking-widest"
+                  autoFocus
+                />
+              </div>
+
+              {showError && (
+                <div className="p-4 rounded-lg bg-destructive/10 border-2 border-destructive animate-fade-in">
+                  <div className="flex items-center gap-3">
+                    <ShieldAlert className="w-5 h-5 text-destructive flex-shrink-0" />
+                    <div>
+                      <p className="font-display text-destructive font-semibold text-sm">
+                        ACCESS DENIED
+                      </p>
+                      <p className="text-destructive/80 text-xs">
+                        Unauthorized Entry — Invalid Code
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full box-glow-blue font-display text-lg min-h-[48px]"
+              >
+                <Lock className="w-4 h-4 mr-2" />
+                Unlock Admin Panel
+              </Button>
+            </form>
+
+            <div className="mt-6 pt-6 border-t border-primary/20">
+              <p className="text-center text-xs text-muted-foreground">
+                Authorized Personnel Only
+              </p>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
