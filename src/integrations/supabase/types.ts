@@ -19,6 +19,7 @@ export type Database = {
           caption: string | null
           event_name: string | null
           id: string
+          template_image_url: string | null
           updated_at: string | null
           watermark: string | null
         }
@@ -26,6 +27,7 @@ export type Database = {
           caption?: string | null
           event_name?: string | null
           id?: string
+          template_image_url?: string | null
           updated_at?: string | null
           watermark?: string | null
         }
@@ -33,6 +35,7 @@ export type Database = {
           caption?: string | null
           event_name?: string | null
           id?: string
+          template_image_url?: string | null
           updated_at?: string | null
           watermark?: string | null
         }
@@ -56,6 +59,33 @@ export type Database = {
           created_at?: string | null
           id?: string
           image_url?: string
+        }
+        Relationships: []
+      }
+      templates: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }

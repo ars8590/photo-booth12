@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Camera, Download, Image, Settings, BarChart3, Trash2, RefreshCw, ArrowDownToLine, Lock, ShieldAlert } from "lucide-react";
+import { Camera, Download, Image, Settings, BarChart3, Trash2, RefreshCw, ArrowDownToLine, Lock, ShieldAlert, Upload, CheckCircle2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,6 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const ACCESS_CODE = "VIBRANIUM2025";
 const SESSION_KEY = "vibranium_admin_access";
@@ -31,8 +30,10 @@ type BoothSettings = {
 type Template = {
   id: string;
   name: string;
-  preview: string;
-  active: boolean;
+  image_url: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 const Admin = () => {
@@ -46,14 +47,10 @@ const Admin = () => {
   const [watermark, setWatermark] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [templates, setTemplates] = useState<Template[]>([
-    { id: '1', name: 'Vibranium Classic', preview: '', active: true }
-  ]);
-  const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const templateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Check if user has valid session
     const hasAccess = sessionStorage.getItem(SESSION_KEY);
     if (hasAccess === ACCESS_CODE) {
       setIsUnlocked(true);
@@ -104,7 +101,7 @@ const Admin = () => {
 
   const loadData = async () => {
     setLoading(true);
-    await Promise.all([loadPhotos(), loadSettings()]);
+    await Promise.all([loadPhotos(), loadSettings(), loadTemplates()]);
     setLoading(false);
   };
 
@@ -144,6 +141,21 @@ const Admin = () => {
     }
   };
 
+  const loadTemplates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('templates')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      if (data) setTemplates(data);
+    } catch (error) {
+      console.error('Error loading templates:', error);
+      toast.error("Failed to load templates");
+    }
+  };
+
   const refreshData = async () => {
     setRefreshing(true);
     await loadData();
@@ -151,20 +163,101 @@ const Admin = () => {
     toast.success("Data refreshed!");
   };
 
+  const handleTemplateUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.includes("png")) {
+      toast.error("Template must be a PNG file with transparency");
+      return;
+    }
+
+    try {
+      const fileName = `template-${Date.now()}.png`;
+      const { error: uploadError } = await supabase.storage
+        .from("photos")
+        .upload(fileName, file, {
+          contentType: "image/png",
+          cacheControl: "3600",
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("photos")
+        .getPublicUrl(fileName);
+
+      const templateName = prompt("Enter template name:") || "Untitled Template";
+
+      const { error: dbError } = await supabase
+        .from("templates")
+        .insert({
+          name: templateName,
+          image_url: publicUrl,
+          is_active: false,
+        });
+
+      if (dbError) throw dbError;
+
+      toast.success("Template uploaded successfully!");
+      loadTemplates();
+    } catch (error) {
+      console.error("Error uploading template:", error);
+      toast.error("Failed to upload template");
+    }
+  };
+
+  const activateTemplate = async (id: string) => {
+    try {
+      await supabase.from("templates").update({ is_active: false }).neq("id", id);
+      
+      const { error } = await supabase
+        .from("templates")
+        .update({ is_active: true })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast.success("Template activated!");
+      loadTemplates();
+    } catch (error) {
+      console.error("Error activating template:", error);
+      toast.error("Failed to activate template");
+    }
+  };
+
+  const deleteTemplate = async (id: string, imageUrl: string) => {
+    if (!confirm("Are you sure you want to delete this template?")) return;
+
+    try {
+      const fileName = imageUrl.split("/").pop();
+      if (fileName) {
+        await supabase.storage.from("photos").remove([fileName]);
+      }
+
+      const { error } = await supabase.from("templates").delete().eq("id", id);
+
+      if (error) throw error;
+
+      toast.success("Template deleted!");
+      loadTemplates();
+    } catch (error) {
+      console.error("Error deleting template:", error);
+      toast.error("Failed to delete template");
+    }
+  };
+
   const deletePhoto = async (photoId: string, imageUrl: string) => {
     try {
-      // Extract file path from URL
       const urlParts = imageUrl.split('/');
       const fileName = urlParts[urlParts.length - 1];
 
-      // Delete from storage
       const { error: storageError } = await supabase.storage
         .from('photos')
         .remove([fileName]);
 
       if (storageError) throw storageError;
 
-      // Delete from database
       const { error: dbError } = await supabase
         .from('photos')
         .delete()
@@ -182,7 +275,6 @@ const Admin = () => {
 
   const deleteAllPhotos = async () => {
     try {
-      // Delete all from storage
       const { data: files } = await supabase.storage
         .from('photos')
         .list();
@@ -196,11 +288,10 @@ const Admin = () => {
         if (storageError) throw storageError;
       }
 
-      // Delete all from database
       const { error: dbError } = await supabase
         .from('photos')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+        .neq('id', '00000000-0000-0000-0000-000000000000');
 
       if (dbError) throw dbError;
 
@@ -255,39 +346,12 @@ const Admin = () => {
     }
   };
 
-  const handleTemplateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const newTemplate: Template = {
-          id: Date.now().toString(),
-          name: file.name.replace(/\.[^/.]+$/, ""),
-          preview: event.target?.result as string,
-          active: false
-        };
-        setTemplates([...templates, newTemplate]);
-        toast.success("Template uploaded successfully!");
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const activateTemplate = (templateId: string) => {
-    setTemplates(templates.map(t => ({
-      ...t,
-      active: t.id === templateId
-    })));
-    toast.success("Template activated!");
-  };
-
   const stats = [
     { label: "Total Photos", value: photos.length.toString(), icon: Camera, color: "text-primary" },
-    { label: "Storage Used", value: `${(photos.length * 0.5).toFixed(1)} MB`, icon: Image, color: "text-accent" },
-    { label: "Photos Downloaded", value: "0", icon: ArrowDownToLine, color: "text-primary" },
+    { label: "Templates", value: templates.length.toString(), icon: Image, color: "text-accent" },
+    { label: "Storage Used", value: `${(photos.length * 0.5).toFixed(1)} MB`, icon: ArrowDownToLine, color: "text-primary" },
   ];
 
-  // Access Gate - Show before admin panel
   if (!isUnlocked) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-background via-primary/5 to-accent/5">
@@ -385,7 +449,6 @@ const Admin = () => {
           </Button>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 md:mb-8">
           {stats.map((stat, index) => (
             <Card key={index} className="p-4 md:p-6 bg-card border-primary/30 hover:border-primary/60 transition-all">
@@ -400,7 +463,6 @@ const Admin = () => {
           ))}
         </div>
 
-        {/* Admin Tabs */}
         <Tabs defaultValue="photos" className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6 bg-card border border-primary/30">
             <TabsTrigger value="photos">Photos</TabsTrigger>
@@ -408,7 +470,6 @@ const Admin = () => {
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
-          {/* Photos Tab */}
           <TabsContent value="photos">
             <Card className="p-4 md:p-6 bg-card border-primary/30">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 md:mb-6 gap-3 md:gap-4">
@@ -429,8 +490,7 @@ const Admin = () => {
                       <AlertDialogHeader>
                         <AlertDialogTitle className="text-base md:text-lg">Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription className="text-sm md:text-base">
-                          This action cannot be undone. This will permanently delete all {photos.length} photos
-                          from both the database and storage.
+                          This action cannot be undone. This will permanently delete all {photos.length} photos.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter className="flex-col sm:flex-row gap-2">
@@ -462,7 +522,7 @@ const Admin = () => {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Delete this photo?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the photo.
+                                This action cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -473,11 +533,6 @@ const Admin = () => {
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
-                        <Button size="sm" variant="outline" asChild>
-                          <a href={photo.image_url} target="_blank" rel="noopener noreferrer">
-                            <Download className="w-4 h-4" />
-                          </a>
-                        </Button>
                       </div>
                     </div>
                   ))
@@ -486,100 +541,126 @@ const Admin = () => {
             </Card>
           </TabsContent>
 
-          {/* Templates Tab */}
           <TabsContent value="templates">
             <Card className="p-4 md:p-6 bg-card border-primary/30">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 md:mb-6 gap-3">
-                <h2 className="font-display text-xl md:text-2xl font-bold text-primary">Template Management</h2>
-                <Button className="box-glow-purple min-h-[48px] w-full sm:w-auto" onClick={() => fileInputRef.current?.click()}>
-                  <Image className="w-4 h-4 mr-2" />
-                  <span className="text-sm md:text-base">Upload Template</span>
+              <div className="flex items-center justify-between mb-4 md:mb-6">
+                <h2 className="font-display text-xl md:text-2xl font-bold text-primary">
+                  Template Gallery
+                </h2>
+                <Button
+                  onClick={() => templateInputRef.current?.click()}
+                  className="box-glow-blue font-display min-h-[48px]"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Template
                 </Button>
                 <input
-                  ref={fileInputRef}
+                  ref={templateInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/png"
                   onChange={handleTemplateUpload}
                   className="hidden"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {templates.map((template, index) => (
-                  <Card key={index} className="p-4 bg-muted border-primary/30 hover:border-primary/60 transition-all">
-                    <div className="aspect-video bg-gradient-metallic rounded-lg mb-3 flex items-center justify-center overflow-hidden">
-                      {template.preview ? (
-                        <img src={template.preview} alt={template.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <Image className="w-12 h-12 text-primary/50" />
+              {templates.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No templates uploaded yet. Upload transparent PNG overlays.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {templates.map((template) => (
+                    <div
+                      key={template.id}
+                      className={`relative group rounded-lg overflow-hidden border-2 transition-all ${
+                        template.is_active
+                          ? "border-primary shadow-[0_0_20px_rgba(0,217,255,0.5)]"
+                          : "border-muted-foreground/20"
+                      }`}
+                    >
+                      <div className="aspect-square bg-black/50">
+                        <img
+                          src={template.image_url}
+                          alt={template.name}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-end p-4 space-y-2">
+                        <p className="font-display text-sm text-primary">
+                          {template.name}
+                        </p>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => activateTemplate(template.id)}
+                            disabled={template.is_active}
+                            size="sm"
+                            className="box-glow-blue"
+                          >
+                            {template.is_active ? (
+                              <>
+                                <CheckCircle2 className="w-4 h-4 mr-1" />
+                                Active
+                              </>
+                            ) : (
+                              "Activate"
+                            )}
+                          </Button>
+                          <Button
+                            onClick={() => deleteTemplate(template.id, template.image_url)}
+                            size="sm"
+                            variant="destructive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      {template.is_active && (
+                        <div className="absolute top-2 right-2 bg-primary/90 text-primary-foreground px-2 py-1 rounded-md text-xs font-display">
+                          ACTIVE
+                        </div>
                       )}
                     </div>
-                    <h3 className="font-display text-base md:text-lg font-semibold mb-2">{template.name}</h3>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="flex-1 min-h-[40px]"
-                        onClick={() => setPreviewTemplate(template)}
-                      >
-                        Preview
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        className={`flex-1 min-h-[40px] ${template.active ? 'box-glow-blue' : ''}`}
-                        onClick={() => activateTemplate(template.id)}
-                      >
-                        {template.active ? 'Active' : 'Activate'}
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </Card>
           </TabsContent>
 
-          {/* Settings Tab */}
           <TabsContent value="settings">
             <Card className="p-4 md:p-6 bg-card border-primary/30">
-              <h2 className="font-display text-xl md:text-2xl font-bold text-primary mb-4 md:mb-6">
-                Booth Settings
-              </h2>
-
-              <div className="space-y-4 md:space-y-6 max-w-2xl">
+              <h2 className="font-display text-xl md:text-2xl font-bold text-primary mb-4 md:mb-6">Booth Settings</h2>
+              <div className="space-y-4 md:space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="fest-name" className="text-sm md:text-base">Event Name</Label>
+                  <Label htmlFor="event-name">Event Name</Label>
                   <Input
-                    id="fest-name"
+                    id="event-name"
                     value={eventName}
                     onChange={(e) => setEventName(e.target.value)}
-                    placeholder="Enter event name"
-                    className="bg-input border-primary/30 min-h-[48px]"
+                    placeholder="e.g., Vibranium 5.0"
+                    className="min-h-[48px]"
                   />
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="caption" className="text-sm md:text-base">Photo Caption</Label>
+                  <Label htmlFor="caption">Caption Text</Label>
                   <Input
                     id="caption"
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
-                    placeholder="Enter photo caption"
-                    className="bg-input border-primary/30 min-h-[48px]"
+                    placeholder="e.g., I HAVE PARTICIPATED"
+                    className="min-h-[48px]"
                   />
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="watermark" className="text-sm md:text-base">Watermark Text</Label>
+                  <Label htmlFor="watermark">Watermark</Label>
                   <Input
                     id="watermark"
                     value={watermark}
                     onChange={(e) => setWatermark(e.target.value)}
-                    placeholder="Enter watermark text"
-                    className="bg-input border-primary/30 min-h-[48px]"
+                    placeholder="e.g., VIBRANIUM 5.0"
+                    className="min-h-[48px]"
                   />
                 </div>
-
-                <Button className="w-full box-glow-blue min-h-[48px] text-sm md:text-base" onClick={saveSettings}>
+                <Button onClick={saveSettings} className="box-glow-blue w-full sm:w-auto min-h-[48px]">
                   <Settings className="w-4 h-4 mr-2" />
                   Save Settings
                 </Button>
@@ -587,40 +668,7 @@ const Admin = () => {
             </Card>
           </TabsContent>
         </Tabs>
-
-        {/* Analytics Section */}
-        <Card className="p-4 md:p-6 bg-card border-primary/30 mt-6">
-          <div className="flex items-center gap-2 mb-4">
-            <BarChart3 className="w-5 h-5 md:w-6 md:h-6 text-primary" />
-            <h2 className="font-display text-xl md:text-2xl font-bold text-primary">Analytics</h2>
-          </div>
-          <div className="h-48 md:h-64 bg-muted rounded-lg flex items-center justify-center border border-primary/20">
-            <div className="text-center px-4">
-              <BarChart3 className="w-12 h-12 md:w-16 md:h-16 text-primary/30 mx-auto mb-4" />
-              <p className="text-sm md:text-base text-muted-foreground">
-                Total Downloads: {photos.length * Math.floor(Math.random() * 3)} | 
-                Avg. Downloads per Photo: {(Math.random() * 5).toFixed(1)}
-              </p>
-            </div>
-          </div>
-        </Card>
       </div>
-
-      {/* Template Preview Dialog */}
-      <Dialog open={!!previewTemplate} onOpenChange={() => setPreviewTemplate(null)}>
-        <DialogContent className="max-w-2xl bg-card border-primary/50">
-          <DialogHeader>
-            <DialogTitle className="font-display text-glow-blue">{previewTemplate?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="aspect-video bg-gradient-metallic rounded-lg flex items-center justify-center overflow-hidden">
-            {previewTemplate?.preview ? (
-              <img src={previewTemplate.preview} alt={previewTemplate.name} className="w-full h-full object-cover" />
-            ) : (
-              <Image className="w-24 h-24 text-primary/50" />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

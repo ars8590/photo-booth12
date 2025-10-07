@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Camera, Upload, Download, RotateCcw, FlipHorizontal, Power } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
 
@@ -15,15 +15,33 @@ const Booth = () => {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [mirrorCamera, setMirrorCamera] = useState(true);
+  const [activeTemplateUrl, setActiveTemplateUrl] = useState<string | null>(null);
   const isMobile = useIsMobile();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    fetchActiveTemplate();
     return () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
     };
   }, [stream]);
+
+  const fetchActiveTemplate = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('templates')
+        .select('image_url')
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (error) throw error;
+      if (data) setActiveTemplateUrl(data.image_url);
+    } catch (error) {
+      console.error('Error fetching template:', error);
+    }
+  };
 
   const startCamera = async () => {
     try {
@@ -121,7 +139,7 @@ const Booth = () => {
     }
   };
 
-  const capturePhoto = () => {
+  const capturePhoto = async () => {
     if (canvasRef.current && videoRef.current) {
       const canvas = canvasRef.current;
       const video = videoRef.current;
@@ -145,10 +163,25 @@ const Booth = () => {
           ctx.scale(-1, 1);
         }
         
+        // Draw camera feed
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
         // Restore context state
         ctx.restore();
+        
+        // If there's an active template, overlay it
+        if (activeTemplateUrl) {
+          await new Promise<void>((resolve, reject) => {
+            const templateImg = new Image();
+            templateImg.crossOrigin = "anonymous";
+            templateImg.onload = () => {
+              ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
+              resolve();
+            };
+            templateImg.onerror = reject;
+            templateImg.src = activeTemplateUrl;
+          });
+        }
         
         const imageData = canvas.toDataURL("image/png");
         setCapturedImage(imageData);
@@ -172,112 +205,47 @@ const Booth = () => {
   const downloadPhoto = async () => {
     if (!capturedImage) return;
 
-    const downloadCanvas = document.createElement("canvas");
-    const ctx = downloadCanvas.getContext("2d");
-    if (!ctx) return;
+    try {
+      // Convert base64 to blob
+      const response = await fetch(capturedImage);
+      const blob = await response.blob();
 
-    // Template dimensions (square format)
-    const templateSize = 1080;
-    const borderWidth = 20;
-    const photoMargin = 100;
-    const photoSize = templateSize - (photoMargin * 2);
+      // Upload to storage
+      const fileName = `vibranium-5.0-${Date.now()}.png`;
+      const { error: uploadError } = await supabase.storage
+        .from('photos')
+        .upload(fileName, blob, {
+          contentType: 'image/png',
+          cacheControl: '3600',
+        });
 
-    downloadCanvas.width = templateSize;
-    downloadCanvas.height = templateSize;
+      if (uploadError) throw uploadError;
 
-    // Load the captured image
-    const img = new Image();
-    img.onload = async () => {
-      // Draw black background
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(0, 0, templateSize, templateSize);
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('photos')
+        .getPublicUrl(fileName);
 
-      // Draw cyan glowing border
-      ctx.strokeStyle = "#00D9FF";
-      ctx.lineWidth = borderWidth;
-      ctx.shadowColor = "#00D9FF";
-      ctx.shadowBlur = 30;
-      ctx.strokeRect(borderWidth / 2, borderWidth / 2, templateSize - borderWidth, templateSize - borderWidth);
+      // Save to database
+      const { error: dbError } = await supabase
+        .from('photos')
+        .insert({ image_url: publicUrl });
 
-      // Reset shadow for photo
-      ctx.shadowBlur = 0;
+      if (dbError) throw dbError;
 
-      // Draw the user's photo in the center
-      const imgAspect = img.width / img.height;
-      let drawWidth = photoSize;
-      let drawHeight = photoSize;
-      let offsetX = photoMargin;
-      let offsetY = photoMargin;
-
-      // Maintain aspect ratio
-      if (imgAspect > 1) {
-        drawHeight = photoSize / imgAspect;
-        offsetY = photoMargin + (photoSize - drawHeight) / 2;
-      } else {
-        drawWidth = photoSize * imgAspect;
-        offsetX = photoMargin + (photoSize - drawWidth) / 2;
-      }
-
-      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
-
-      // Draw bottom text
-      ctx.fillStyle = "#00D9FF";
-      ctx.shadowColor = "#00D9FF";
-      ctx.shadowBlur = 20;
-      ctx.font = "bold 48px 'Orbitron', sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("I Have Participated – Vibranium 5.0", templateSize / 2, templateSize - 80);
-
-      // Draw watermark
-      ctx.font = "bold 24px 'Orbitron', sans-serif";
-      ctx.textAlign = "right";
-      ctx.fillText("Vibranium 5.0", templateSize - 40, templateSize - 40);
-
-      // Convert to blob and save to database
-      downloadCanvas.toBlob(async (blob) => {
-        if (blob) {
-          try {
-            // Upload to storage
-            const fileName = `vibranium-5.0-${Date.now()}.png`;
-            const { data: uploadData, error: uploadError } = await supabase.storage
-              .from('photos')
-              .upload(fileName, blob, {
-                contentType: 'image/png',
-                cacheControl: '3600',
-              });
-
-            if (uploadError) throw uploadError;
-
-            // Get public URL
-            const { data: { publicUrl } } = supabase.storage
-              .from('photos')
-              .getPublicUrl(fileName);
-
-            // Save to database
-            const { error: dbError } = await supabase
-              .from('photos')
-              .insert({ image_url: publicUrl });
-
-            if (dbError) throw dbError;
-
-            // Download the file
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = fileName;
-            link.click();
-            URL.revokeObjectURL(url);
-            
-            toast.success("Photo saved and downloaded!");
-          } catch (error) {
-            console.error('Error saving photo:', error);
-            toast.error("Failed to save photo");
-          }
-        }
-      }, "image/png");
-    };
-
-    img.src = capturedImage;
+      // Download the file
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      toast.success("Photo saved and downloaded!");
+    } catch (error) {
+      console.error('Error saving photo:', error);
+      toast.error("Failed to save photo");
+    }
   };
 
   const retakePhoto = async () => {
@@ -297,7 +265,7 @@ const Booth = () => {
         </div>
 
         {/* Main Camera/Photo View */}
-        <div className="relative rounded-2xl overflow-hidden border-4 border-glow aspect-[9/16] md:aspect-video mb-6 bg-metallic">
+        <div ref={containerRef} className="relative rounded-2xl overflow-hidden border-4 border-glow aspect-[9/16] md:aspect-video mb-6 bg-metallic">
         {!capturedImage ? (
             <>
               {/* Video Element - Always rendered */}
@@ -313,6 +281,16 @@ const Booth = () => {
                   transform: mirrorCamera ? 'scaleX(-1)' : 'scaleX(1)',
                 }}
               />
+              
+              {/* Template Overlay */}
+              {cameraActive && activeTemplateUrl && (
+                <img
+                  src={activeTemplateUrl}
+                  alt="Template overlay"
+                  className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                />
+              )}
+              
               <canvas ref={canvasRef} className="hidden" />
               
               {/* Camera Power Toggle Button */}
