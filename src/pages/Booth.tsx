@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera, Upload, Download, RotateCcw, FlipHorizontal, Power, Sparkles } from "lucide-react";
+import { Camera, Upload, Download, RotateCcw, FlipHorizontal, Power, Sparkles, SwitchCamera } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -24,6 +24,7 @@ const Booth = () => {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [mirrorCamera, setMirrorCamera] = useState(true);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [activeTemplateUrl, setActiveTemplateUrl] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('normal');
   const [showFilters, setShowFilters] = useState(false);
@@ -64,7 +65,7 @@ const Booth = () => {
       
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: { ideal: "user" },
+          facingMode: { ideal: facingMode },
           width: { ideal: idealWidth },
           height: { ideal: idealHeight },
           aspectRatio: { ideal: aspectRatio },
@@ -149,6 +150,18 @@ const Booth = () => {
     } else {
       await startCamera();
     }
+  };
+
+  const switchCamera = async () => {
+    const newFacingMode = facingMode === "user" ? "environment" : "user";
+    setFacingMode(newFacingMode);
+    if (cameraActive) {
+      stopCamera();
+      setTimeout(async () => {
+        await startCamera();
+      }, 100);
+    }
+    toast.info(`Switched to ${newFacingMode === "user" ? "front" : "back"} camera`);
   };
 
   const capturePhoto = async () => {
@@ -476,12 +489,23 @@ const Booth = () => {
                     style={{ zIndex: 3 }}
                   />
                   
+                  {/* Camera Switch Button - z-index: 10 */}
+                  <Button
+                    onClick={switchCamera}
+                    size="icon"
+                    variant="secondary"
+                    className="absolute top-4 right-4 box-glow-blue backdrop-blur-sm bg-background/50 border border-primary/30"
+                    style={{ zIndex: 10 }}
+                  >
+                    <SwitchCamera className="w-5 h-5 text-primary" />
+                  </Button>
+                  
                   {/* Mirror Toggle Button - z-index: 10 */}
                   <Button
                     onClick={() => setMirrorCamera(!mirrorCamera)}
                     size="icon"
                     variant="secondary"
-                    className="absolute top-4 right-4 box-glow-blue backdrop-blur-sm bg-background/50 border border-primary/30"
+                    className="absolute top-4 right-20 box-glow-blue backdrop-blur-sm bg-background/50 border border-primary/30"
                     style={{ zIndex: 10 }}
                   >
                     <FlipHorizontal className={`w-5 h-5 ${mirrorCamera ? 'text-primary' : 'text-muted-foreground'}`} />
