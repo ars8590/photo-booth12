@@ -6,13 +6,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile, useMobileOrientation } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
 
-type FilterType = 'normal' | 'blackwhite' | 'anime-ai' | 'age-reduce-ai';
+type FilterType = 'normal' | 'blackwhite' | 'anime-ai';
 
 const FILTERS: { id: FilterType; name: string; icon: string; css: string; isAI?: boolean }[] = [
   { id: 'normal', name: 'Normal', icon: '🎞', css: 'none' },
   { id: 'blackwhite', name: 'Black & White', icon: '⚫', css: 'grayscale(1) contrast(1.2)' },
   { id: 'anime-ai', name: 'AI Anime Artstyle', icon: '🎨', css: 'none', isAI: true },
-  { id: 'age-reduce-ai', name: 'Age-Reducing', icon: '🕓', css: 'none', isAI: true },
 ];
 
 const Booth = () => {
@@ -29,6 +28,7 @@ const Booth = () => {
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('normal');
   const [showFilters, setShowFilters] = useState(false);
   const [isProcessingAI, setIsProcessingAI] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const mobileOrientation = useMobileOrientation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -253,26 +253,162 @@ const Booth = () => {
   };
 
   const capturePhoto = async () => {
+    if (!canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // If an uploaded image is active, process that instead of live video
+    const isUsingUploaded = !!uploadedImage;
+
+    if (isUsingUploaded) {
+      try {
+        const src = uploadedImage as string;
+        const img = new Image();
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = reject;
+          img.src = src;
+        });
+
+        // Target a 4:3 working canvas
+        const targetW = 1280;
+        const targetH = 960;
+        canvas.width = targetW;
+        canvas.height = targetH;
+
+        ctx.save();
+        // Draw uploaded image with contain behavior to keep full FOV
+        const imgAspect = img.naturalWidth / img.naturalHeight;
+        const canvasAspect = targetW / targetH;
+        let drawW: number;
+        let drawH: number;
+        let dx = 0;
+        let dy = 0;
+        if (imgAspect > canvasAspect) {
+          // image wider
+          drawW = targetW;
+          drawH = Math.round(drawW / imgAspect);
+          dy = Math.round((targetH - drawH) / 2);
+        } else {
+          // image taller
+          drawH = targetH;
+          drawW = Math.round(drawH * imgAspect);
+          dx = Math.round((targetW - drawW) / 2);
+        }
+        ctx.drawImage(img, dx, dy, drawW, drawH);
+
+        // Apply CSS-like filter for non-AI filters
+        const activeFilter = FILTERS.find(f => f.id === selectedFilter);
+        if (activeFilter && activeFilter.css !== 'none' && !activeFilter.isAI) {
+          // Redraw with filter by using an intermediate canvas
+          const tmp = document.createElement('canvas');
+          tmp.width = targetW; tmp.height = targetH;
+          const tctx = tmp.getContext('2d');
+          if (tctx) {
+            tctx.filter = activeFilter.css;
+            tctx.drawImage(canvas, 0, 0, targetW, targetH);
+            ctx.clearRect(0, 0, targetW, targetH);
+            ctx.drawImage(tmp, 0, 0);
+          }
+        }
+
+        // Handle AI filters identically to camera path
+        let finalImageData = canvas.toDataURL('image/png');
+        const isAnimeFilter = selectedFilter === 'anime-ai';
+        if (isAnimeFilter) {
+          setIsProcessingAI(true);
+          try {
+            const downscaleDataUrl = async (dataUrl: string, maxSize = 1024, quality = 0.85): Promise<string> => {
+              return new Promise((resolve, reject) => {
+                const im = new Image();
+                im.onload = () => {
+                  const sw = im.naturalWidth;
+                  const sh = im.naturalHeight;
+                  const scale = Math.min(1, maxSize / Math.max(sw, sh));
+                  const tw = Math.max(1, Math.round(sw * scale));
+                  const th = Math.max(1, Math.round(sh * scale));
+                  const tc = document.createElement('canvas');
+                  tc.width = tw; tc.height = th;
+                  const tcx = tc.getContext('2d');
+                  if (!tcx) return resolve(dataUrl);
+                  tcx.drawImage(im, 0, 0, tw, th);
+                  resolve(tc.toDataURL('image/jpeg', quality));
+                };
+                im.onerror = reject;
+                im.src = dataUrl;
+              });
+            };
+
+            const payloadImage = await downscaleDataUrl(finalImageData, 1024, 0.85);
+            const functionName = 'anime-style-transform';
+            const { data, error } = await supabase.functions.invoke(functionName, {
+              body: { imageData: payloadImage }
+            });
+            if (error) throw error;
+            const transformedImageKey = 'animeImage';
+            if (!data?.[transformedImageKey]) throw new Error('No transformed image returned');
+
+            const transformedImg = new Image();
+            await new Promise<void>((resolve, reject) => {
+              transformedImg.onload = () => resolve();
+              transformedImg.onerror = reject;
+              transformedImg.src = data[transformedImageKey];
+            });
+            ctx.clearRect(0, 0, targetW, targetH);
+            ctx.drawImage(transformedImg, 0, 0, targetW, targetH);
+
+            if (activeTemplateUrl) {
+              const templateImg = new Image();
+              await new Promise<void>((resolve, reject) => {
+                templateImg.onload = () => resolve();
+                templateImg.onerror = reject;
+                templateImg.src = activeTemplateUrl as string;
+              });
+              ctx.drawImage(templateImg, 0, 0, targetW, targetH);
+            }
+            finalImageData = canvas.toDataURL('image/png');
+            toast.success('💠 Your Anime Self is Ready!');
+          } catch (e) {
+            console.error('AI processing failed for uploaded image:', e);
+            toast.error('AI processing failed. Showing original image.');
+          } finally {
+            setIsProcessingAI(false);
+          }
+        }
+
+        // Show result as captured image and clear uploaded preview
+        const out = canvas.toDataURL('image/png');
+        setCapturedImage(out);
+        setUploadedImage(null);
+        toast.success('Photo processed!');
+        ctx.restore();
+        return;
+      } catch (e) {
+        console.error('Upload processing error:', e);
+        toast.error('Failed to process uploaded image');
+        return;
+      }
+    }
+
+    // Live camera path
     if (canvasRef.current && videoRef.current) {
-      const canvas = canvasRef.current;
       const video = videoRef.current;
-      
       // Check if video is ready
       if (video.videoWidth === 0 || video.videoHeight === 0) {
         toast.error("Camera not ready. Please wait a moment.");
         return;
       }
-      
+
       // Get actual camera resolution from video stream
       const track = stream?.getVideoTracks()[0];
       const settings = track?.getSettings();
       const actualWidth = settings?.width || video.videoWidth;
       const actualHeight = settings?.height || video.videoHeight;
-      
+
       // Use actual camera resolution for canvas
       canvas.width = actualWidth;
       canvas.height = actualHeight;
-      const ctx = canvas.getContext("2d");
       if (ctx) {
         // Save context state
         ctx.save();
@@ -332,18 +468,15 @@ const Booth = () => {
           setIsProcessingAI(true);
           
           const isAnimeFilter = selectedFilter === 'anime-ai';
-          const isAgeReduceFilter = selectedFilter === 'age-reduce-ai';
           
           if (isAnimeFilter) {
             toast.info("✨ Generating Anime Style... Please wait...");
-          } else if (isAgeReduceFilter) {
-            toast.info("🕓 Rewinding time... Creating your younger self...");
           }
           
           try {
             // Downscale before sending to edge function to avoid payload limits
             const payloadImage = await downscaleDataUrl(finalImageData, 1024, 0.85);
-            const functionName = isAnimeFilter ? 'anime-style-transform' : 'age-reducing-transform';
+            const functionName = 'anime-style-transform';
             const { data, error } = await supabase.functions.invoke(functionName, {
               body: { imageData: payloadImage }
             });
@@ -357,7 +490,7 @@ const Booth = () => {
               throw new Error(status ? `${status}: ${body || error.message}` : (error.message || 'Edge function error'));
             }
             
-            const transformedImageKey = isAnimeFilter ? 'animeImage' : 'transformedImage';
+            const transformedImageKey = 'animeImage';
             if (!data?.[transformedImageKey]) {
               console.error('Unexpected AI response payload:', data);
               throw new Error('No transformed image returned');
@@ -401,14 +534,11 @@ const Booth = () => {
             
             if (isAnimeFilter) {
               toast.success("💠 Your Anime Self is Ready!");
-            } else if (isAgeReduceFilter) {
-              toast.success("💫 You've traveled back in time!");
             }
           } catch (error) {
             console.error('Error processing AI filter:', error);
-            const filterType = isAnimeFilter ? 'anime style' : 'age reduction';
             const errMsg = error instanceof Error ? error.message : 'Unknown error';
-            toast.error(`Failed to apply ${filterType}: ${errMsg}. Using original photo.`);
+            toast.error(`Failed to apply anime style: ${errMsg}. Using original photo.`);
             // Continue with non-AI processed image
           } finally {
             setIsProcessingAI(false);
@@ -442,66 +572,14 @@ const Booth = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const img = new Image();
     const reader = new FileReader();
-
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       const src = event.target?.result as string;
-      img.onload = async () => {
-        const canvas = canvasRef.current || document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        // Determine target size based on actual camera resolution
-        const video = videoRef.current;
-        const track = stream?.getVideoTracks()[0];
-        const settings = track?.getSettings();
-        const targetW = settings?.width || video?.videoWidth || 1280;
-        const targetH = settings?.height || video?.videoHeight || 960;
-        canvas.width = targetW;
-        canvas.height = targetH;
-
-        // Draw uploaded image with object-fit: cover behavior
-        const imgAspect = img.naturalWidth / img.naturalHeight;
-        const canvasAspect = targetW / targetH;
-        let drawW = targetW;
-        let drawH = targetH;
-        let dx = 0;
-        let dy = 0;
-        if (imgAspect > canvasAspect) {
-          // Image is wider than canvas
-          drawH = targetH;
-          drawW = imgAspect * drawH;
-          dx = (targetW - drawW) / 2;
-        } else {
-          // Image is taller than canvas
-          drawW = targetW;
-          drawH = drawW / imgAspect;
-          dy = (targetH - drawH) / 2;
-        }
-        ctx.drawImage(img, dx, dy, drawW, drawH);
-
-        // Overlay active template if present
-        if (activeTemplateUrl) {
-          await new Promise<void>((resolve, reject) => {
-            const overlay = new Image();
-            overlay.crossOrigin = 'anonymous';
-            overlay.onload = () => {
-              ctx.drawImage(overlay, 0, 0, targetW, targetH);
-              resolve();
-            };
-            overlay.onerror = reject;
-            overlay.src = activeTemplateUrl;
-          });
-        }
-
-        const merged = canvas.toDataURL('image/png');
-        setCapturedImage(merged);
-        toast.success('Photo uploaded!');
-      };
-      img.src = src;
+      // Show uploaded preview in the camera container and enable filters
+      setUploadedImage(src);
+      setCapturedImage(null);
+      toast.success('Photo uploaded! Tap Filters to apply effects.');
     };
-
     reader.readAsDataURL(file);
   };
 
@@ -608,7 +686,28 @@ const Booth = () => {
                   aspectRatio: '4 / 3',
                 }}
               />
+
+              {/* Uploaded Image Preview - Above Video, Below Overlays */}
+              {uploadedImage && (
+                <img
+                  id="uploadedPreview"
+                  src={uploadedImage}
+                  alt="Uploaded Preview"
+                  className="absolute top-0 left-0 w-full h-full"
+                  style={{ objectFit: 'contain', zIndex: 2, borderRadius: 12, background: '#000' }}
+                />
+              )}
               
+              {/* Loading Overlay for AI Processing */}
+              <div
+                id="loadingOverlay"
+                className={`loading-overlay ${isProcessingAI ? '' : 'hidden'}`}
+                style={{ zIndex: 9 }}
+              >
+                <div className="spinner" />
+                <p>Processing...</p>
+              </div>
+
               {/* Template Overlay - Top Layer (z-index: 2) */}
               {cameraActive && activeTemplateUrl && (
                 <img
@@ -731,6 +830,16 @@ const Booth = () => {
         <div className="button-group">
           {!capturedImage ? (
             <>
+              {/* Capture Button (moved above Filters) */}
+              <button
+                id="capture-btn"
+                onClick={capturePhoto}
+                disabled={!cameraActive || isProcessingAI}
+                className="vibranium-button capture-button"
+              >
+                📸 {isProcessingAI ? "Processing..." : "Capture Photo"}
+              </button>
+
               {/* Filter Button */}
               {cameraActive && (
                 <>
@@ -767,17 +876,7 @@ const Booth = () => {
                   )}
                 </>
               )}
-              
-              {/* Capture Button */}
-              <button
-                id="capture-btn"
-                onClick={capturePhoto}
-                disabled={!cameraActive || isProcessingAI}
-                className="vibranium-button capture-button"
-              >
-                📸 {isProcessingAI ? "Processing..." : "Capture Photo"}
-              </button>
-              
+
               {/* Upload Button */}
               <button
                 id="upload-btn"
@@ -788,6 +887,7 @@ const Booth = () => {
               </button>
               
               <input
+                id="imageUploadInput"
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
