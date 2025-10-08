@@ -60,6 +60,27 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Local setup
+
+1. Install dependencies
+
+```sh
+npm install
+```
+
+2. Create a `.env.local` file in the project root with:
+
+```
+VITE_SUPABASE_URL=your-project-url
+VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-key
+```
+
+3. Start the dev server
+
+```sh
+npm run dev
+```
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/afc18af9-128f-4a9c-918c-62821b88dfad) and click on Share -> Publish.

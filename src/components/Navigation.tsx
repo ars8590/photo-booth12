@@ -22,34 +22,34 @@ const Navigation = () => {
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 bg-card/50 backdrop-blur-md border-b border-primary/30">
-        <div className="container mx-auto px-4 py-3 md:py-4">
+        <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-3 md:py-4">
           <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-gradient-vibranium flex items-center justify-center">
-                <Camera className="w-5 h-5 md:w-6 md:h-6 text-background" />
+            <Link to="/" className="flex items-center gap-1 sm:gap-2">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 rounded-lg bg-gradient-vibranium flex items-center justify-center">
+                <Camera className="w-3 h-3 sm:w-5 sm:h-5 md:w-6 md:h-6 text-background" />
               </div>
-              <h1 className="font-display font-bold text-base md:text-xl text-glow-blue">VIBRANIUM 5.0</h1>
+              <h1 className="font-display font-bold text-sm sm:text-base md:text-xl text-glow-blue">VIBRANIUM 5.0</h1>
             </Link>
 
-            <div className="flex items-center gap-2 md:gap-4">
+            <div className="flex items-center gap-1 sm:gap-2 md:gap-4">
               <Link to="/">
                 <Button
                   variant={location.pathname === "/" ? "default" : "ghost"}
                   size="sm"
-                  className={`min-h-[48px] ${location.pathname === "/" ? "box-glow-blue" : ""}`}
+                  className={`min-h-[40px] sm:min-h-[44px] md:min-h-[48px] px-2 sm:px-3 md:px-4 ${location.pathname === "/" ? "box-glow-blue" : ""}`}
                 >
-                  <Camera className="w-4 h-4 md:mr-2" />
-                  <span className="hidden sm:inline">Booth</span>
+                  <Camera className="w-3 h-3 sm:w-4 sm:h-4 md:mr-2" />
+                  <span className="hidden sm:inline text-xs sm:text-sm">Booth</span>
                 </Button>
               </Link>
               <Link to="/feed">
                 <Button
                   variant={location.pathname === "/feed" ? "default" : "ghost"}
                   size="sm"
-                  className={`min-h-[48px] ${location.pathname === "/feed" ? "box-glow-blue" : ""}`}
+                  className={`min-h-[40px] sm:min-h-[44px] md:min-h-[48px] px-2 sm:px-3 md:px-4 ${location.pathname === "/feed" ? "box-glow-blue" : ""}`}
                 >
-                  <Grid3x3 className="w-4 h-4 md:mr-2" />
-                  <span className="hidden sm:inline">Feed</span>
+                  <Grid3x3 className="w-3 h-3 sm:w-4 sm:h-4 md:mr-2" />
+                  <span className="hidden sm:inline text-xs sm:text-sm">Feed</span>
                 </Button>
               </Link>
             </div>

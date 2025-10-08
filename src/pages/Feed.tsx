@@ -109,10 +109,10 @@ const Feed = () => {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center">
+      <div className="h-screen flex items-center justify-center px-4">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="font-display text-xl text-muted-foreground">Loading Feed...</p>
+          <div className="w-12 h-12 sm:w-16 sm:h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="font-display text-lg sm:text-xl text-muted-foreground">Loading Feed...</p>
         </div>
       </div>
     );
@@ -132,7 +132,7 @@ const Feed = () => {
 
       {/* Photo Modal */}
       <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
-        <DialogContent className="max-w-4xl bg-card border-primary/50 p-0">
+        <DialogContent className="max-w-xs sm:max-w-2xl md:max-w-4xl bg-card border-primary/50 p-0 mx-2 sm:mx-4">
           <div className="relative">
             <img
               src={selectedPhoto || ""}
@@ -144,31 +144,32 @@ const Feed = () => {
             <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-accent/10" />
 
             {/* Caption */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/95 to-transparent p-6">
-              <p className="text-center font-display text-2xl font-bold text-glow-blue mb-1">
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/95 to-transparent p-3 sm:p-6">
+              <p className="text-center font-display text-lg sm:text-2xl font-bold text-glow-blue mb-1">
                 {settings?.caption || "I HAVE PARTICIPATED"}
               </p>
-              <p className="text-center font-display text-lg text-accent text-glow-purple">
+              <p className="text-center font-display text-sm sm:text-lg text-accent text-glow-purple">
                 {settings?.event_name || "VIBRANIUM 5.0"}
               </p>
             </div>
 
             {/* Download Button */}
-            <div className="absolute top-4 right-4 flex gap-2">
+            <div className="absolute top-2 right-2 sm:top-4 sm:right-4 flex gap-1 sm:gap-2">
               <Button
                 onClick={() => selectedPhoto && downloadPhoto(selectedPhoto)}
                 size="sm"
-                className="box-glow-blue"
+                className="box-glow-blue text-xs sm:text-sm"
               >
-                <Download className="w-4 h-4 mr-2" />
-                Download
+                <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Download</span>
               </Button>
               <Button
                 onClick={() => setSelectedPhoto(null)}
                 variant="secondary"
                 size="sm"
+                className="text-xs sm:text-sm"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3 h-3 sm:w-4 sm:h-4" />
               </Button>
             </div>
           </div>

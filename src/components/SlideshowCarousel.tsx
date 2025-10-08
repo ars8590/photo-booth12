@@ -76,10 +76,10 @@ export const SlideshowCarousel = ({
 
   if (photos.length === 0) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5">
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5 px-4">
         <div className="text-center">
-          <p className="font-display text-2xl text-muted-foreground mb-2">No Photos Yet</p>
-          <p className="text-muted-foreground">Photos will appear here as they are captured</p>
+          <p className="font-display text-lg sm:text-2xl text-muted-foreground mb-2">No Photos Yet</p>
+          <p className="text-sm sm:text-base text-muted-foreground">Photos will appear here as they are captured</p>
         </div>
       </div>
     );
@@ -117,32 +117,32 @@ export const SlideshowCarousel = ({
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:24px_24px] opacity-20" />
       
       {/* Main Photo */}
-      <div className="relative h-full w-full flex items-center justify-center p-8">
+      <div className="relative h-full w-full flex items-center justify-center p-4 sm:p-6 md:p-8">
         <div
           className={cn(
-            "relative max-w-5xl max-h-full w-full transition-all duration-500 ease-out",
+            "relative max-w-xs sm:max-w-2xl md:max-w-4xl lg:max-w-5xl max-h-full w-full transition-all duration-500 ease-out",
             getAnimationClass()
           )}
         >
           <img
             src={photos[currentIndex].image_url}
             alt={`Photo ${currentIndex + 1}`}
-            className="w-full h-full object-contain rounded-2xl shadow-2xl box-glow-blue"
+            className="w-full h-full object-contain rounded-xl sm:rounded-2xl shadow-2xl box-glow-blue"
           />
           
           {/* Holographic Glow */}
-          <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 via-transparent to-accent/20 rounded-2xl pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 via-transparent to-accent/20 rounded-xl sm:rounded-2xl pointer-events-none" />
         </div>
       </div>
 
       {/* Caption Overlay */}
       {showCaption && (
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/95 via-background/80 to-transparent p-8 pb-12">
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/95 via-background/80 to-transparent p-4 sm:p-6 md:p-8 pb-8 sm:pb-10 md:pb-12">
           <div className="text-center animate-fade-in">
-            <p className="font-display text-4xl md:text-5xl font-bold text-glow-blue mb-2">
+            <p className="font-display text-xl sm:text-2xl md:text-4xl lg:text-5xl font-bold text-glow-blue mb-1 sm:mb-2">
               {caption}
             </p>
-            <p className="font-display text-2xl md:text-3xl text-accent text-glow-purple">
+            <p className="font-display text-lg sm:text-xl md:text-2xl lg:text-3xl text-accent text-glow-purple">
               {eventName}
             </p>
           </div>
@@ -153,36 +153,36 @@ export const SlideshowCarousel = ({
       {showControls && (
         <div
           className={cn(
-            "fixed bottom-8 right-8 flex gap-2 transition-opacity duration-300 z-50",
+            "fixed bottom-4 right-4 sm:bottom-6 sm:right-6 md:bottom-8 md:right-8 flex gap-1 sm:gap-2 transition-opacity duration-300 z-50",
             controlsVisible ? "opacity-100" : "opacity-0"
           )}
         >
           <Button
             onClick={prevSlide}
             size="icon"
-            className="w-12 h-12 rounded-full box-glow-blue"
+            className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full box-glow-blue"
           >
-            <ChevronLeft className="w-6 h-6" />
+            <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
           </Button>
           <Button
             onClick={togglePlay}
             size="icon"
-            className="w-12 h-12 rounded-full box-glow-blue"
+            className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full box-glow-blue"
           >
-            {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
+            {isPlaying ? <Pause className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" /> : <Play className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />}
           </Button>
           <Button
             onClick={nextSlide}
             size="icon"
-            className="w-12 h-12 rounded-full box-glow-blue"
+            className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full box-glow-blue"
           >
-            <ChevronRight className="w-6 h-6" />
+            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
           </Button>
         </div>
       )}
 
       {/* Photo Counter */}
-      <div className="absolute top-8 right-8 bg-card/80 backdrop-blur-sm border border-primary/30 rounded-full px-4 py-2 font-display text-sm">
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 md:top-8 md:right-8 bg-card/80 backdrop-blur-sm border border-primary/30 rounded-full px-2 sm:px-3 md:px-4 py-1 sm:py-2 font-display text-xs sm:text-sm">
         {currentIndex + 1} / {photos.length}
       </div>
     </div>
