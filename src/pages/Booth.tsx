@@ -570,25 +570,28 @@ const Booth = () => {
         {/* Camera and Controls Container */}
         <div className="space-y-4 sm:space-y-6 md:space-y-8">
 
-        {/* Main Camera/Photo View */}
-        <div 
-          ref={containerRef} 
-          className={`relative rounded-xl sm:rounded-2xl overflow-hidden border-2 sm:border-4 border-glow mb-6 sm:mb-8 ${
-            isMobile 
-              ? mobileOrientation === 'portrait' 
-                ? 'aspect-[3/4]' 
+        {/* Camera Section with Centered Buttons */}
+        <div className="camera-section">
+          {/* Camera Container */}
+          <div 
+            ref={containerRef} 
+            className={`camera-container ${
+              isMobile 
+                ? mobileOrientation === 'portrait' 
+                  ? 'aspect-[3/4]' 
+                  : 'aspect-[4/3]'
                 : 'aspect-[4/3]'
-              : 'aspect-[4/3]'
-          }`}
-          style={{
-            // Add background for mobile selfie view to prevent black bars
-            backgroundColor: isMobile && facingMode === "user" ? '#1a1a1a' : 'transparent'
-          }}
-        >
+            }`}
+            style={{
+              // Add background for mobile selfie view to prevent black bars
+              backgroundColor: isMobile && facingMode === "user" ? '#1a1a1a' : 'transparent'
+            }}
+          >
         {!capturedImage ? (
             <>
               {/* Video Element - Bottom Layer (z-index: 1) */}
               <video
+                id="cameraPreview"
                 ref={videoRef}
                 autoPlay
                 playsInline
@@ -724,75 +727,66 @@ const Booth = () => {
           )}
         </div>
 
-        {/* Filter Selector */}
-        {!capturedImage && cameraActive && (
-          <div className="mb-4 sm:mb-6 animate-fade-in">
-            <div className="flex justify-center px-2 sm:px-4">
-              <Button
-                onClick={() => setShowFilters(!showFilters)}
-                variant="outline"
-                size="lg"
-                disabled={isProcessingAI}
-                className="box-glow-purple font-display text-sm sm:text-base md:text-lg px-6 sm:px-8 md:px-12 min-h-[48px] sm:min-h-[52px] md:min-h-[56px] w-full max-w-sm mx-auto border-2 border-accent/50 bg-gradient-to-r from-accent/10 to-accent/5 backdrop-blur-sm hover:scale-105 transition-all duration-300 shadow-[0_0_15px_rgba(168,85,247,0.2)] hover:shadow-[0_0_25px_rgba(168,85,247,0.4)]"
-              >
-                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 mr-2 sm:mr-3" />
-                Filters {FILTERS.find(f => f.id === selectedFilter)?.icon}
-              </Button>
-            </div>
-            
-            {showFilters && (
-              <div className="flex justify-center gap-2 sm:gap-3 mt-3 sm:mt-4 overflow-x-auto pb-2 animate-scale-in px-2 sm:px-4">
-                {FILTERS.map((filter) => (
-                  <Button
-                    key={filter.id}
-                    onClick={() => {
-                      setSelectedFilter(filter.id);
-                      toast.success(
-                        filter.isAI 
-                          ? `${filter.name} will be applied after capture!` 
-                          : `${filter.name} filter applied!`
-                      );
-                    }}
-                    variant={selectedFilter === filter.id ? "default" : "outline"}
-                    size="lg"
-                    disabled={isProcessingAI}
-                    className={`flex-shrink-0 font-display min-w-[120px] sm:min-w-[140px] md:min-w-[150px] transition-all duration-300 ${
-                      selectedFilter === filter.id 
-                        ? 'box-glow-blue border-2 border-primary scale-105 shadow-[0_0_25px_rgba(0,217,255,0.7)]' 
-                        : 'border-2 border-muted-foreground/30 hover:border-accent hover:scale-105'
-                    }`}
-                  >
-                    <span className="text-xl sm:text-2xl mr-1 sm:mr-2">{filter.icon}</span>
-                    <span className="text-xs sm:text-sm font-medium">{filter.name}</span>
-                  </Button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Control Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 md:gap-6 justify-center items-center max-w-2xl mx-auto px-2 sm:px-4">
+        {/* Button Group - Perfectly Centered */}
+        <div className="button-group">
           {!capturedImage ? (
             <>
-              <Button
+              {/* Filter Button */}
+              {cameraActive && (
+                <>
+                  <button
+                    id="filters-btn"
+                    onClick={() => setShowFilters(!showFilters)}
+                    disabled={isProcessingAI}
+                    className="vibranium-button filters-button"
+                  >
+                    🎨 Filters {FILTERS.find(f => f.id === selectedFilter)?.icon}
+                  </button>
+                  
+                  {showFilters && (
+                    <div className="filter-options">
+                      {FILTERS.map((filter) => (
+                        <button
+                          key={filter.id}
+                          onClick={() => {
+                            setSelectedFilter(filter.id);
+                            toast.success(
+                              filter.isAI 
+                                ? `${filter.name} will be applied after capture!` 
+                                : `${filter.name} filter applied!`
+                            );
+                          }}
+                          disabled={isProcessingAI}
+                          className={`filter-option ${selectedFilter === filter.id ? 'active' : ''}`}
+                        >
+                          <span className="filter-icon">{filter.icon}</span>
+                          <span className="filter-name">{filter.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+              
+              {/* Capture Button */}
+              <button
+                id="capture-btn"
                 onClick={capturePhoto}
                 disabled={!cameraActive || isProcessingAI}
-                size="lg"
-                className="box-glow-blue font-display text-sm sm:text-base md:text-lg px-6 sm:px-8 md:px-12 min-h-[48px] sm:min-h-[52px] md:min-h-[56px] w-full max-w-sm mx-auto sm:w-auto sm:min-w-[180px] md:min-w-[200px] hover:scale-105 transition-all duration-300 bg-gradient-to-r from-primary/20 to-primary/10 border-2 border-primary/50 shadow-[0_0_20px_rgba(0,217,255,0.3)] hover:shadow-[0_0_30px_rgba(0,217,255,0.5)]"
+                className="vibranium-button capture-button"
               >
-                <Camera className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 mr-2 sm:mr-3" />
-                {isProcessingAI ? "Processing..." : "Capture Photo"}
-              </Button>
-              <Button
+                📸 {isProcessingAI ? "Processing..." : "Capture Photo"}
+              </button>
+              
+              {/* Upload Button */}
+              <button
+                id="upload-btn"
                 onClick={() => fileInputRef.current?.click()}
-                variant="secondary"
-                size="lg"
-                className="box-glow-purple font-display text-sm sm:text-base md:text-lg px-6 sm:px-8 md:px-12 min-h-[48px] sm:min-h-[52px] md:min-h-[56px] w-full max-w-sm mx-auto sm:w-auto sm:min-w-[180px] md:min-w-[200px] hover:scale-105 transition-all duration-300 bg-gradient-to-r from-accent/20 to-accent/10 border-2 border-accent/50 shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.5)]"
+                className="vibranium-button upload-button"
               >
-                <Upload className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 mr-2 sm:mr-3" />
-                Upload Photo
-              </Button>
+                ⬆️ Upload Photo
+              </button>
+              
               <input
                 ref={fileInputRef}
                 type="file"
@@ -803,25 +797,26 @@ const Booth = () => {
             </>
           ) : (
             <>
-              <Button
+              {/* Download Button */}
+              <button
+                id="download-btn"
                 onClick={downloadPhoto}
-                size="lg"
-                className="box-glow-blue font-display text-sm sm:text-base md:text-lg px-6 sm:px-8 md:px-12 min-h-[48px] sm:min-h-[52px] md:min-h-[56px] w-full max-w-sm mx-auto sm:w-auto sm:min-w-[180px] md:min-w-[200px] hover:scale-105 transition-all duration-300 bg-gradient-to-r from-primary/20 to-primary/10 border-2 border-primary/50 shadow-[0_0_20px_rgba(0,217,255,0.3)] hover:shadow-[0_0_30px_rgba(0,217,255,0.5)]"
+                className="vibranium-button download-button"
               >
-                <Download className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 mr-2 sm:mr-3" />
-                Save and Download Photo
-              </Button>
-              <Button
+                💾 Save and Download Photo
+              </button>
+              
+              {/* Retake Button */}
+              <button
+                id="retake-btn"
                 onClick={retakePhoto}
-                variant="secondary"
-                size="lg"
-                className="box-glow-purple font-display text-sm sm:text-base md:text-lg px-6 sm:px-8 md:px-12 min-h-[48px] sm:min-h-[52px] md:min-h-[56px] w-full max-w-sm mx-auto sm:w-auto sm:min-w-[180px] md:min-w-[200px] hover:scale-105 transition-all duration-300 bg-gradient-to-r from-accent/20 to-accent/10 border-2 border-accent/50 shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.5)]"
+                className="vibranium-button retake-button"
               >
-                <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 mr-2 sm:mr-3" />
-                Retake
-              </Button>
+                🔄 Retake
+              </button>
             </>
           )}
+        </div>
         </div>
         </div>
       </div>
