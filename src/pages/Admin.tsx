@@ -238,6 +238,23 @@ const Admin = () => {
     }
   };
 
+  const deactivateTemplate = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("templates")
+        .update({ is_active: false })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast.success("Template deactivated!");
+      loadTemplates();
+    } catch (error) {
+      console.error("Error deactivating template:", error);
+      toast.error("Failed to deactivate template");
+    }
+  };
+
   const deleteTemplate = async (id: string, imageUrl: string) => {
     if (!confirm("Are you sure you want to delete this template?")) return;
 
@@ -564,13 +581,15 @@ const Admin = () => {
                 <h2 className="font-display text-xl md:text-2xl font-bold text-primary">
                   Template Gallery
                 </h2>
-                <Button
-                  onClick={() => templateInputRef.current?.click()}
-                  className="box-glow-blue font-display min-h-[48px]"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Upload Template
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => templateInputRef.current?.click()}
+                    className="box-glow-blue font-display min-h-[48px]"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Template
+                  </Button>
+                </div>
                 <input
                   ref={templateInputRef}
                   type="file"
@@ -578,6 +597,45 @@ const Admin = () => {
                   onChange={handleTemplateUpload}
                   className="hidden"
                 />
+              </div>
+
+              {/* Device Preview Simulators */}
+              <div className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                <h3 className="font-display text-lg font-bold text-primary mb-4">Device Preview Simulators</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Desktop Preview */}
+                  <div className="text-center">
+                    <div className="aspect-[4/3] bg-black/50 rounded-lg border border-primary/30 mb-2 relative overflow-hidden">
+                      <div className="absolute inset-0 flex items-center justify-center text-primary/50 text-xs">
+                        Desktop Preview
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Desktop (4:3)</p>
+                  </div>
+                  
+                  {/* Tablet Preview */}
+                  <div className="text-center">
+                    <div className="aspect-[4/3] bg-black/50 rounded-lg border border-primary/30 mb-2 relative overflow-hidden">
+                      <div className="absolute inset-0 flex items-center justify-center text-primary/50 text-xs">
+                        Tablet Preview
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Tablet (4:3)</p>
+                  </div>
+                  
+                  {/* Mobile Preview */}
+                  <div className="text-center">
+                    <div className="aspect-[3/4] bg-black/50 rounded-lg border border-primary/30 mb-2 relative overflow-hidden">
+                      <div className="absolute inset-0 flex items-center justify-center text-primary/50 text-xs">
+                        Mobile Preview
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Mobile (3:4)</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Templates will automatically scale and align to fit these aspect ratios across all devices.
+                </p>
               </div>
 
               {templates.length === 0 ? (
@@ -607,21 +665,24 @@ const Admin = () => {
                           {template.name}
                         </p>
                         <div className="flex gap-2">
-                          <Button
-                            onClick={() => activateTemplate(template.id)}
-                            disabled={template.is_active}
-                            size="sm"
-                            className="box-glow-blue"
-                          >
-                            {template.is_active ? (
-                              <>
-                                <CheckCircle2 className="w-4 h-4 mr-1" />
-                                Active
-                              </>
-                            ) : (
-                              "Activate"
-                            )}
-                          </Button>
+                          {template.is_active ? (
+                            <Button
+                              onClick={() => deactivateTemplate(template.id)}
+                              size="sm"
+                              variant="secondary"
+                              className="border-orange-500/50 text-orange-500 hover:bg-orange-500/10"
+                            >
+                              Deactivate
+                            </Button>
+                          ) : (
+                            <Button
+                              onClick={() => activateTemplate(template.id)}
+                              size="sm"
+                              className="box-glow-blue"
+                            >
+                              Activate
+                            </Button>
+                          )}
                           <Button
                             onClick={() => deleteTemplate(template.id, template.image_url)}
                             size="sm"

@@ -15,4 +15,21 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    outDir: "dist",
+    assetsDir: "assets",
+    sourcemap: mode === "development",
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom"],
+          ui: ["@radix-ui/react-dialog", "@radix-ui/react-tabs"],
+          supabase: ["@supabase/supabase-js"],
+        },
+      },
+    },
+  },
+  define: {
+    global: "globalThis",
+  },
 }));

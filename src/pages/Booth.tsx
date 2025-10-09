@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile, useMobileOrientation } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
+import { getViewportInfo, applyResponsiveTemplate, getTemplateOverlayStyles } from "@/lib/template-utils";
 
 type FilterType = 'normal' | 'blackwhite' | 'anime-ai';
 
@@ -29,6 +30,7 @@ const Booth = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [viewportInfo, setViewportInfo] = useState(getViewportInfo());
   const isMobile = useIsMobile();
   const mobileOrientation = useMobileOrientation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -53,6 +55,11 @@ const Booth = () => {
     }
   };
 
+  // Function to update viewport info
+  const updateViewportInfo = () => {
+    setViewportInfo(getViewportInfo());
+  };
+
   useEffect(() => {
     fetchActiveTemplate();
     
@@ -74,6 +81,21 @@ const Booth = () => {
       }
     };
   }, [stream, isMobile]);
+
+  // Update viewport info on resize and orientation change
+  useEffect(() => {
+    const handleResize = () => {
+      updateViewportInfo();
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
 
   const fetchActiveTemplate = async () => {
     try {
@@ -359,13 +381,7 @@ const Booth = () => {
             ctx.drawImage(transformedImg, 0, 0, targetW, targetH);
 
             if (activeTemplateUrl) {
-              const templateImg = new Image();
-              await new Promise<void>((resolve, reject) => {
-                templateImg.onload = () => resolve();
-                templateImg.onerror = reject;
-                templateImg.src = activeTemplateUrl as string;
-              });
-              ctx.drawImage(templateImg, 0, 0, targetW, targetH);
+              await applyResponsiveTemplate(canvas, activeTemplateUrl, viewportInfo);
             }
             finalImageData = canvas.toDataURL('image/png');
             toast.success('💠 Your Anime Self is Ready!');
@@ -518,16 +534,7 @@ const Booth = () => {
             
             // Overlay template if exists
             if (activeTemplateUrl) {
-              const templateImg = new Image();
-              templateImg.crossOrigin = "anonymous";
-              
-              await new Promise((resolve, reject) => {
-                templateImg.onload = resolve;
-                templateImg.onerror = reject;
-                templateImg.src = activeTemplateUrl;
-              });
-              
-              transformedCtx.drawImage(templateImg, 0, 0, transformedCanvas.width, transformedCanvas.height);
+              await applyResponsiveTemplate(transformedCanvas, activeTemplateUrl, viewportInfo);
             }
 
             finalImageData = transformedCanvas.toDataURL('image/png');
@@ -546,16 +553,7 @@ const Booth = () => {
         } else {
           // For non-AI filters, just apply template overlay
           if (activeTemplateUrl) {
-            await new Promise<void>((resolve, reject) => {
-              const templateImg = new Image();
-              templateImg.crossOrigin = "anonymous";
-              templateImg.onload = () => {
-                ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
-                resolve();
-              };
-              templateImg.onerror = reject;
-              templateImg.src = activeTemplateUrl;
-            });
+            await applyResponsiveTemplate(canvas, activeTemplateUrl, viewportInfo);
             finalImageData = canvas.toDataURL("image/png");
           }
         }
@@ -713,11 +711,8 @@ const Booth = () => {
                 <img
                   src={activeTemplateUrl}
                   alt="Template overlay"
-                  className="absolute top-0 left-0 w-full h-full object-cover pointer-events-none"
-                  style={{
-                    zIndex: 2,
-                    background: 'transparent',
-                  }}
+                  className="absolute top-0 left-0 pointer-events-none"
+                  style={getTemplateOverlayStyles(viewportInfo)}
                 />
               )}
               
