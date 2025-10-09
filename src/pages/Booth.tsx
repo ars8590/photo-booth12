@@ -23,8 +23,8 @@ const Booth = () => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
-  const [mirrorCamera, setMirrorCamera] = useState(true);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [mirrorCamera, setMirrorCamera] = useState(false);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [activeTemplateUrl, setActiveTemplateUrl] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('normal');
   const [showFilters, setShowFilters] = useState(false);
@@ -587,6 +587,9 @@ const Booth = () => {
   const downloadPhoto = async () => {
     if (!capturedImage) return;
 
+    // Hide save button immediately when clicked
+    setIsPhotoSaved(true);
+
     try {
       // Convert base64 to blob
       const response = await fetch(capturedImage);
@@ -623,7 +626,6 @@ const Booth = () => {
       link.click();
       URL.revokeObjectURL(url);
       
-      setIsPhotoSaved(true); // Mark photo as saved
       toast.success("Photo saved and downloaded!");
     } catch (error) {
       console.error('Error saving photo:', error);
@@ -904,7 +906,7 @@ const Booth = () => {
                   onClick={downloadPhoto}
                   className="vibranium-button download-button"
                 >
-                  💾 Save and Download Photo
+                  💾 Save
                 </button>
               )}
               
