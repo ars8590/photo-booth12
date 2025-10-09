@@ -32,6 +32,7 @@ export const SlideshowCarousel = ({
   const [isPlaying, setIsPlaying] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [imageRatio, setImageRatio] = useState<'portrait' | 'landscape' | 'square'>('landscape');
 
   const nextSlide = useCallback(() => {
     if (photos.length === 0) return;
@@ -52,6 +53,24 @@ export const SlideshowCarousel = ({
   }, [photos.length]);
 
   const togglePlay = () => setIsPlaying(!isPlaying);
+
+  // Detect image ratio when current photo changes
+  useEffect(() => {
+    if (photos.length === 0) return;
+    
+    const img = new Image();
+    img.onload = () => {
+      const aspectRatio = img.width / img.height;
+      if (aspectRatio > 1.1) {
+        setImageRatio('landscape');
+      } else if (aspectRatio < 0.9) {
+        setImageRatio('portrait');
+      } else {
+        setImageRatio('square');
+      }
+    };
+    img.src = photos[currentIndex].image_url;
+  }, [currentIndex, photos]);
 
   // Auto-advance slides
   useEffect(() => {
@@ -117,21 +136,31 @@ export const SlideshowCarousel = ({
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:24px_24px] opacity-20" />
       
       {/* Main Photo */}
-      <div className="relative h-full w-full flex items-center justify-center p-4 sm:p-6 md:p-8">
+      <div className="relative h-full w-full flex items-center justify-center">
         <div
           className={cn(
-            "relative max-w-xs sm:max-w-2xl md:max-w-4xl lg:max-w-5xl max-h-full w-full transition-all duration-500 ease-out",
-            getAnimationClass()
+            "relative transition-all duration-500 ease-out shadow-2xl box-glow-blue",
+            getAnimationClass(),
+            // Dynamic sizing based on image ratio
+            imageRatio === 'portrait' && "h-full w-auto max-w-full",
+            imageRatio === 'landscape' && "w-full h-auto max-h-full",
+            imageRatio === 'square' && "w-full h-full"
           )}
         >
           <img
             src={photos[currentIndex].image_url}
             alt={`Photo ${currentIndex + 1}`}
-            className="w-full h-full object-contain rounded-xl sm:rounded-2xl shadow-2xl box-glow-blue"
+            className={cn(
+              "transition-all duration-500",
+              // Dynamic object-fit based on image ratio
+              imageRatio === 'portrait' && "h-full w-auto object-contain",
+              imageRatio === 'landscape' && "w-full h-auto object-contain",
+              imageRatio === 'square' && "w-full h-full object-cover"
+            )}
           />
           
           {/* Holographic Glow */}
-          <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 via-transparent to-accent/20 rounded-xl sm:rounded-2xl pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 via-transparent to-accent/20 pointer-events-none" />
         </div>
       </div>
 

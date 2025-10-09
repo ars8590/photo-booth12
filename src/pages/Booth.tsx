@@ -31,6 +31,7 @@ const Booth = () => {
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [viewportInfo, setViewportInfo] = useState(getViewportInfo());
+  const [isPhotoSaved, setIsPhotoSaved] = useState(false);
   const isMobile = useIsMobile();
   const mobileOrientation = useMobileOrientation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -396,6 +397,7 @@ const Booth = () => {
         // Show result as captured image and clear uploaded preview
         const out = canvas.toDataURL('image/png');
         setCapturedImage(out);
+        setIsPhotoSaved(false); // Reset saved state when new photo is captured
         setUploadedImage(null);
         toast.success('Photo processed!');
         ctx.restore();
@@ -559,6 +561,7 @@ const Booth = () => {
         }
 
         setCapturedImage(finalImageData);
+        setIsPhotoSaved(false); // Reset saved state when new photo is captured
         if (!activeFilter?.isAI) {
           toast.success("Photo captured!");
         }
@@ -620,6 +623,7 @@ const Booth = () => {
       link.click();
       URL.revokeObjectURL(url);
       
+      setIsPhotoSaved(true); // Mark photo as saved
       toast.success("Photo saved and downloaded!");
     } catch (error) {
       console.error('Error saving photo:', error);
@@ -629,6 +633,7 @@ const Booth = () => {
 
   const retakePhoto = async () => {
     setCapturedImage(null);
+    setIsPhotoSaved(false); // Reset saved state when retaking
     await startCamera();
     toast.info("Ready for next photo!");
   };
@@ -892,16 +897,18 @@ const Booth = () => {
             </>
           ) : (
             <>
-              {/* Download Button */}
-              <button
-                id="download-btn"
-                onClick={downloadPhoto}
-                className="vibranium-button download-button"
-              >
-                💾 Save and Download Photo
-              </button>
+              {/* Show Save button only if photo hasn't been saved yet */}
+              {!isPhotoSaved && (
+                <button
+                  id="download-btn"
+                  onClick={downloadPhoto}
+                  className="vibranium-button download-button"
+                >
+                  💾 Save and Download Photo
+                </button>
+              )}
               
-              {/* Retake Button */}
+              {/* Always show Retake button after photo is captured */}
               <button
                 id="retake-btn"
                 onClick={retakePhoto}
