@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import JSZip from "jszip";
 
 const ACCESS_CODE = "VIBRANIUM2025";
 const SESSION_KEY = "vibranium_admin_access";
@@ -339,15 +340,45 @@ const Admin = () => {
     }
     
     toast.info("Preparing photos for export...");
-    photos.forEach((photo, index) => {
-      setTimeout(() => {
-        const link = document.createElement("a");
-        link.href = photo.image_url;
-        link.download = `vibranium-photo-${index + 1}.png`;
-        link.click();
-      }, index * 200);
-    });
-    toast.success(`Exporting ${photos.length} photos!`);
+    
+    try {
+      const zip = new JSZip();
+      
+      // Add each photo to the zip
+      for (let i = 0; i < photos.length; i++) {
+        const photo = photos[i];
+        try {
+          // Fetch the image data
+          const response = await fetch(photo.image_url);
+          const blob = await response.blob();
+          
+          // Add to zip with a descriptive filename
+          const fileName = `vibranium-photo-${i + 1}-${new Date(photo.created_at).toISOString().split('T')[0]}.png`;
+          zip.file(fileName, blob);
+        } catch (error) {
+          console.error(`Failed to fetch photo ${i + 1}:`, error);
+          toast.warning(`Failed to include photo ${i + 1} in export`);
+        }
+      }
+      
+      // Generate the zip file
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      
+      // Create download link
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `vibranium-photos-${new Date().toISOString().split('T')[0]}.zip`;
+      link.click();
+      
+      // Clean up
+      URL.revokeObjectURL(url);
+      
+      toast.success(`Successfully exported ${photos.length} photos as ZIP file!`);
+    } catch (error) {
+      console.error('Error creating zip file:', error);
+      toast.error("Failed to create zip file");
+    }
   };
 
   const saveSettings = async () => {
